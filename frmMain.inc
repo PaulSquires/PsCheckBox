@@ -1,5 +1,5 @@
 #include once "frmMain.bi"
-#include once "CBufferPaint.bi"
+#include once "PsBufferPaint.bi"
 
 
 ' One settings row: the label the form draws, and the checkbox that sits at its right.
@@ -11,7 +11,7 @@ dim shared gRows(0 to CHECKBOX_COUNT - 1) as DEMO_ROW
 
 ' How many times each checkbox has notified, drawn back into the row's small print. Two things
 ' are visible in that number: a cancelled gesture (press, slide off, release) does NOT count, and
-' neither does a programmatic CCheckBox_SetChecked.
+' neither does a programmatic PsCheckBox_SetChecked.
 dim shared gChanges(0 to CHECKBOX_COUNT - 1) as long
 
 
@@ -45,10 +45,10 @@ end function
 '
 ' The form draws the labels and the hairlines; each checkbox paints its own cell. There is no
 ' container window between them -- the same arrangement tiko's Output panel uses for its
-' CSelectBar + CIconPanel pair.
+' PsSelectBar + PsIconPanel pair.
 ' ========================================================================================
 function frmMain_OnPaint( byval hwnd as HWND ) as LRESULT
-    dim as CBufferPaint b
+    dim as PsBufferPaint b
 
     b.BeginDoubleBuffer(hwnd)
     b.SetBackColor( theme.BackColor )
@@ -106,7 +106,7 @@ end function
 '                   with the box hard against the right edge.
 '   ROW_ALIGNC/R    slack past ideal. Sized to ideal the caption span IS the caption, so LEFT,
 '                   CENTER and RIGHT all render identically and the rows demonstrate nothing --
-'                   which is exactly how CButton's demo first shipped. Slack is what makes
+'                   which is exactly how PsButton's demo first shipped. Slack is what makes
 '                   alignment visible at all.
 '   ROW_HOTROW      slack too, so the hover highlight is a visible band rather than a hairline
 '                   around the text.
@@ -132,7 +132,7 @@ sub frmMain_PositionChecks( byval hwnd as HWND )
         dim as RECT rcRow = RowRect( hwnd, i )
 
         dim as long iw, ih
-        CCheckBox_GetIdealSize( ghCheck(i), iw, ih )
+        PsCheckBox_GetIdealSize( ghCheck(i), iw, ih )
         if (iw <= 0) orelse (ih <= 0) then continue for
 
         select case i
@@ -158,17 +158,17 @@ end sub
 ' TWO THINGS TO TRY THAT SHOULD PRODUCE NO LINE AT ALL:
 '   - press a checkbox, SLIDE OFF IT, and release. That is the press/cancel gesture the mouse
 '     capture exists to protect.
-'   - watch rows 3, 4 and 5 at startup: their states were set with CCheckBox_SetChecked, which is
+'   - watch rows 3, 4 and 5 at startup: their states were set with PsCheckBox_SetChecked, which is
 '     silent. Nothing is printed and no count appears.
 ' ========================================================================================
-sub CCheckBox_DemoChanged( byval hCheckBox as HWND, byval isChecked as boolean )
+sub PsCheckBox_DemoChanged( byval hCheckBox as HWND, byval isChecked as boolean )
     dim as long idx = GetDlgCtrlID(hCheckBox) - IDC_FRMMAIN_CHK_FIRST
     if (idx >= 0) andalso (idx < CHECKBOX_COUNT) then gChanges(idx) += 1
 
     ' The caption goes through a plain string first: PRINT on a DWSTRING, or on a
     ' string & wstring concat, interleaves nulls (Learnings.md).
     dim as wstring * 512 wszCaption
-    wszCaption = CCheckBox_GetText( hCheckBox )
+    wszCaption = PsCheckBox_GetText( hCheckBox )
     dim as string s = "CheckChanged   ctrl=" & str(GetDlgCtrlID(hCheckBox)) & _
                       "  checked=" & str(isChecked) & "   [" & str(wszCaption) & "]"
     print s
@@ -180,7 +180,7 @@ end sub
 ' Only the down-message is reported, and only for one row: printing every WM_MOUSEMOVE would bury
 ' everything else. Returns FALSE so the control's own handling proceeds -- suppressing the DOWN
 ' would suppress the press itself.
-function CCheckBox_DemoMessage( byval m as CCHECKBOX_MESSAGEINFO ptr ) as boolean
+function PsCheckBox_DemoMessage( byval m as PSCHECKBOX_MESSAGEINFO ptr ) as boolean
     if m = 0 then return false
     if m->uMsg = WM_LBUTTONDOWN then
         dim as string s = "  (message callback saw WM_LBUTTONDOWN on ctrl=" & _
@@ -192,7 +192,7 @@ end function
 
 ' Consulted only because this checkbox has no tooltip text of its own. Answering "" here would
 ' show no tip at all -- there is no caption fallback in this control.
-function CCheckBox_DemoTooltip( byval hCheckBox as HWND ) as DWSTRING
+function PsCheckBox_DemoTooltip( byval hCheckBox as HWND ) as DWSTRING
     return "Supplied on demand by the tooltip callback"
 end function
 
@@ -204,13 +204,13 @@ end function
 ' THE ONE TRAP THIS DEMONSTRATES AVOIDING. PaintBorderRect goes through PaintRectFactory, which
 ' ALWAYS fills the rect with _backcolor before stroking it -- so reaching for it to draw an
 ' outline floods everything underneath. That mistake has now been made three separate times in
-' this family (CToggle, CComboBox, CNumericUpDown), every time by copying a sibling's callback.
+' this family (PsToggle, PsComboBox, PsNumericUpDown), every time by copying a sibling's callback.
 ' PaintRoundOutline is the one that strokes without filling; PaintRectFactory with an explicit
 ' fill colour is the one to use when the fill IS wanted, which is the case for the swatch below.
 '
-' frmMain_Show probes this callback with CCheckBox_CountRenderedTones for exactly that reason.
+' frmMain_Show probes this callback with PsCheckBox_CountRenderedTones for exactly that reason.
 ' ========================================================================================
-sub CCheckBox_DemoPaint( byval p as CCHECKBOX_PAINTINFO ptr )
+sub PsCheckBox_DemoPaint( byval p as PSCHECKBOX_PAINTINFO ptr )
     if p = 0 then exit sub
 
     dim as COLORREF clrLine = theme.ForeColor
@@ -373,11 +373,11 @@ function frmMain_Show( byval hWndParent as HWND ) as LRESULT
     gRows(ROW_GLYPHS).wszNote       = "E739 / E73E instead of the default E739 / E73A pair"
 
     for i as long = 0 to CHECKBOX_COUNT - 1
-        ghCheck(i) = CCheckBox_Create( HWND_FRMMAIN, IDC_FRMMAIN_CHK_FIRST + i )
-        CCheckBox_SetFont( ghCheck(i), ghFont(GUIFONT_10) )
-        CCheckBox_SetGlyphFont( ghCheck(i), ghFont(SYMBOLFONT_12) )
-        CCheckBox_SetCheckChangedCallback( ghCheck(i), @CCheckBox_DemoChanged )
-        CCheckBox_SetText( ghCheck(i), "Enable dark mode" )
+        ghCheck(i) = PsCheckBox_Create( HWND_FRMMAIN, IDC_FRMMAIN_CHK_FIRST + i )
+        PsCheckBox_SetFont( ghCheck(i), ghFont(GUIFONT_10) )
+        PsCheckBox_SetGlyphFont( ghCheck(i), ghFont(SYMBOLFONT_12) )
+        PsCheckBox_SetCheckChangedCallback( ghCheck(i), @PsCheckBox_DemoChanged )
+        PsCheckBox_SetText( ghCheck(i), "Enable dark mode" )
     next
 
     ' Row 0 -- the plain case, box on the left. Everything else is a variation on it.
@@ -385,72 +385,72 @@ function frmMain_Show( byval hWndParent as HWND ) as LRESULT
     ' Rows 1 and 2 -- THE SAME CONTROL, THE SAME SETTINGS. Only the width the host gives them
     ' differs, and that is the whole argument for pinning the box to the padding rather than
     ' packing it against the caption: one model, both looks.
-    CCheckBox_SetBoxAlign( ghCheck(ROW_RIGHT_IDEAL), CHK_BOXALIGN_RIGHT )
-    CCheckBox_SetBoxAlign( ghCheck(ROW_RIGHT_ROW), CHK_BOXALIGN_RIGHT )
+    PsCheckBox_SetBoxAlign( ghCheck(ROW_RIGHT_IDEAL), CHK_BOXALIGN_RIGHT )
+    PsCheckBox_SetBoxAlign( ghCheck(ROW_RIGHT_ROW), CHK_BOXALIGN_RIGHT )
 
     ' Row 3 -- checked before it is ever shown. SetChecked is SILENT, so no notification is
     ' printed and the row's change count stays absent until you click it.
-    CCheckBox_SetChecked( ghCheck(ROW_CHECKED), true )
+    PsCheckBox_SetChecked( ghCheck(ROW_CHECKED), true )
 
     ' Rows 4 / 5 -- both disabled states, because each has its own colour and a disabled ticked
     ' box must still read as ticked.
-    CCheckBox_SetText( ghCheck(ROW_DIS_ON), "Cannot change this" )
-    CCheckBox_SetChecked( ghCheck(ROW_DIS_ON), true )
-    CCheckBox_SetEnabled( ghCheck(ROW_DIS_ON), false )
+    PsCheckBox_SetText( ghCheck(ROW_DIS_ON), "Cannot change this" )
+    PsCheckBox_SetChecked( ghCheck(ROW_DIS_ON), true )
+    PsCheckBox_SetEnabled( ghCheck(ROW_DIS_ON), false )
 
-    CCheckBox_SetText( ghCheck(ROW_DIS_OFF), "Cannot change this either" )
-    CCheckBox_SetEnabled( ghCheck(ROW_DIS_OFF), false )
+    PsCheckBox_SetText( ghCheck(ROW_DIS_OFF), "Cannot change this either" )
+    PsCheckBox_SetEnabled( ghCheck(ROW_DIS_OFF), false )
 
     ' Row 6 -- box only. No caption means no gap is charged, and the ideal HEIGHT drops to the
     ' box: it is visibly shorter than its neighbours, which is honest rather than a bug (nothing
     ' in it is as tall as a line of text).
-    CCheckBox_SetText( ghCheck(ROW_NOCAPTION), "" )
+    PsCheckBox_SetText( ghCheck(ROW_NOCAPTION), "" )
 
     ' Rows 7 / 8 -- caption alignment WITHIN THE SPAN. frmMain_PositionChecks gives both slack
     ' past their ideal width; the box stays pinned to its padding in both, which is the point.
-    CCheckBox_SetText( ghCheck(ROW_ALIGNC), "Centred" )
-    CCheckBox_SetTextAlign( ghCheck(ROW_ALIGNC), CHK_TEXTALIGN_CENTER )
+    PsCheckBox_SetText( ghCheck(ROW_ALIGNC), "Centred" )
+    PsCheckBox_SetTextAlign( ghCheck(ROW_ALIGNC), CHK_TEXTALIGN_CENTER )
 
-    CCheckBox_SetText( ghCheck(ROW_ALIGNR), "Right" )
-    CCheckBox_SetTextAlign( ghCheck(ROW_ALIGNR), CHK_TEXTALIGN_RIGHT )
+    PsCheckBox_SetText( ghCheck(ROW_ALIGNR), "Right" )
+    PsCheckBox_SetTextAlign( ghCheck(ROW_ALIGNR), CHK_TEXTALIGN_RIGHT )
 
     ' Row 9 -- the hover highlight. The control ships FLAT: BackColorHot and BackColorPressed are
     ' defaulted equal to BackColor. Setting them is all it takes to get a menu-style row.
     scope
-        dim as CCHECKBOX_COLORS c
-        CCheckBox_GetColors( ghCheck(ROW_HOTROW), @c )
+        dim as PSCHECKBOX_COLORS c
+        PsCheckBox_GetColors( ghCheck(ROW_HOTROW), @c )
         c.BackColorHot     = theme.BackColorHot
         c.BackColorPressed = theme.BackColorSelect
-        CCheckBox_SetColors( ghCheck(ROW_HOTROW), @c )
+        PsCheckBox_SetColors( ghCheck(ROW_HOTROW), @c )
     end scope
-    CCheckBox_SetText( ghCheck(ROW_HOTROW), "Highlight the whole row" )
+    PsCheckBox_SetText( ghCheck(ROW_HOTROW), "Highlight the whole row" )
 
     ' Row 10 -- the built-in painter replaced wholesale.
-    CCheckBox_SetText( ghCheck(ROW_CUSTOM), "Host-drawn swatch" )
-    CCheckBox_SetPaintCallback( ghCheck(ROW_CUSTOM), @CCheckBox_DemoPaint )
-    CCheckBox_SetMessageCallback( ghCheck(ROW_CUSTOM), @CCheckBox_DemoMessage )
+    PsCheckBox_SetText( ghCheck(ROW_CUSTOM), "Host-drawn swatch" )
+    PsCheckBox_SetPaintCallback( ghCheck(ROW_CUSTOM), @PsCheckBox_DemoPaint )
+    PsCheckBox_SetMessageCallback( ghCheck(ROW_CUSTOM), @PsCheckBox_DemoMessage )
 
     ' Row 11 -- no caption, but a tooltip: with nothing on screen but a box, the tip is the only
     ' way to find out what it does. Deliberately given NO text of its own, so the CALLBACK is the
     ' thing being exercised.
-    CCheckBox_SetText( ghCheck(ROW_TOOLTIP), "" )
-    CCheckBox_SetTooltipCallback( ghCheck(ROW_TOOLTIP), @CCheckBox_DemoTooltip )
+    PsCheckBox_SetText( ghCheck(ROW_TOOLTIP), "" )
+    PsCheckBox_SetTooltipCallback( ghCheck(ROW_TOOLTIP), @PsCheckBox_DemoTooltip )
 
     ' Row 12 -- a caption far too long for the width the host will give it.
-    CCheckBox_SetText( ghCheck(ROW_ELLIPSIS), "Automatically restore the previous session" )
+    PsCheckBox_SetText( ghCheck(ROW_ELLIPSIS), "Automatically restore the previous session" )
 
     ' Row 13 -- the codepoints swapped. E739 stays as the empty box; E73E (a bare CheckMark, the
-    ' glyph CButton's demo puts on its OK button) replaces the composite E73A, so checking it
+    ' glyph PsButton's demo puts on its OK button) replaces the composite E73A, so checking it
     ' shows a tick with no box around it.
-    CCheckBox_SetText( ghCheck(ROW_GLYPHS), "Bare tick instead of a box" )
-    CCheckBox_SetGlyphUnchecked( ghCheck(ROW_GLYPHS), wchr(&hE739) )
-    CCheckBox_SetGlyphChecked( ghCheck(ROW_GLYPHS), wchr(&hE73E) )
+    PsCheckBox_SetText( ghCheck(ROW_GLYPHS), "Bare tick instead of a box" )
+    PsCheckBox_SetGlyphUnchecked( ghCheck(ROW_GLYPHS), wchr(&hE739) )
+    PsCheckBox_SetGlyphChecked( ghCheck(ROW_GLYPHS), wchr(&hE73E) )
 
     dim as long iw, ih
-    CCheckBox_GetIdealSize( ghCheck(0), iw, ih )
+    PsCheckBox_GetIdealSize( ghCheck(0), iw, ih )
     dim as string s = "row 0 ideal size (box + caption): " & str(iw) & "x" & str(ih)
     print s
-    CCheckBox_GetIdealSize( ghCheck(ROW_NOCAPTION), iw, ih )
+    PsCheckBox_GetIdealSize( ghCheck(ROW_NOCAPTION), iw, ih )
     s = "row 6 ideal size (box only):      " & str(iw) & "x" & str(ih)
     print s
 
@@ -459,16 +459,16 @@ function frmMain_Show( byval hWndParent as HWND ) as LRESULT
         ShowWindow( ghCheck(i), SW_SHOW )
     next
 
-    ' Self-gated on CCHECKBOX_SELFTEST=1.
-    CCheckBox_RunSelfTest( HWND_FRMMAIN )
+    ' Self-gated on PSCHECKBOX_SELFTEST=1.
+    PsCheckBox_RunSelfTest( HWND_FRMMAIN )
 
     ' The control's own self-test can only probe the BUILT-IN painter -- it knows nothing about
     ' this demo. The host paint callback above is exactly the place the family's PaintBorderRect
     ' flood has shipped from three times, so it is probed HERE, by the host, which is also the
     ' pattern a real host should copy for its own painter.
-    if environ("CCHECKBOX_SELFTEST") = "1" then
-        dim as long tCon  = CCheckBox_CountRenderedTones( ghCheck(ROW_CUSTOM), CHK_PART_CONTROL )
-        dim as long tTxt  = CCheckBox_CountRenderedTones( ghCheck(ROW_CUSTOM), CHK_PART_TEXT )
+    if environ("PSCHECKBOX_SELFTEST") = "1" then
+        dim as long tCon  = PsCheckBox_CountRenderedTones( ghCheck(ROW_CUSTOM), CHK_PART_CONTROL )
+        dim as long tTxt  = PsCheckBox_CountRenderedTones( ghCheck(ROW_CUSTOM), CHK_PART_TEXT )
         dim as string sHost = "PASS  "
         if (tCon <= 1) orelse (tTxt <= 1) then sHost = "FAIL  "
         sHost &= "demo paint callback does not flood   [content tones=" & str(tCon) & _
@@ -478,11 +478,11 @@ function frmMain_Show( byval hWndParent as HWND ) as LRESULT
         ' ...and that the host painter, which carries the state in its FILL rather than in a
         ' glyph, still moves the pixels when the state changes. Same claim as the control's own
         ' probe, made against a completely different renderer.
-        CCheckBox_SetChecked( ghCheck(ROW_CUSTOM), false )
-        dim as ulong hOff = CCheckBox_HashRenderedPart( ghCheck(ROW_CUSTOM), CHK_PART_BOX )
-        CCheckBox_SetChecked( ghCheck(ROW_CUSTOM), true )
-        dim as ulong hOn  = CCheckBox_HashRenderedPart( ghCheck(ROW_CUSTOM), CHK_PART_BOX )
-        CCheckBox_SetChecked( ghCheck(ROW_CUSTOM), false )
+        PsCheckBox_SetChecked( ghCheck(ROW_CUSTOM), false )
+        dim as ulong hOff = PsCheckBox_HashRenderedPart( ghCheck(ROW_CUSTOM), CHK_PART_BOX )
+        PsCheckBox_SetChecked( ghCheck(ROW_CUSTOM), true )
+        dim as ulong hOn  = PsCheckBox_HashRenderedPart( ghCheck(ROW_CUSTOM), CHK_PART_BOX )
+        PsCheckBox_SetChecked( ghCheck(ROW_CUSTOM), false )
         dim as string sHash = "PASS  "
         if hOff = hOn then sHash = "FAIL  "
         sHash &= "demo paint callback renders the state   [off=&h" & hex(hOff) & _
@@ -506,8 +506,8 @@ function frmMain_Show( byval hWndParent as HWND ) as LRESULT
 
     ' Message loop
     '
-    ' THERE IS NO CCheckBox_FilterMessage. This control owns no popup and no second top-level
-    ' window, so unlike CComboBox / CNumericUpDown / CTextBox it adds NO pump obligation.
+    ' THERE IS NO PsCheckBox_FilterMessage. This control owns no popup and no second top-level
+    ' window, so unlike PsComboBox / PsNumericUpDown / PsTextBox it adds NO pump obligation.
     do while GetMessage(@uMsg, null, 0, 0)
         if uMsg.message = WM_QUIT then exit do
 

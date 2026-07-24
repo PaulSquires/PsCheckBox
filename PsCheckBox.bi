@@ -1,21 +1,21 @@
 ''
-''  CCheckBox.bi  --  owner-drawn checkbox (Fluent box glyph + caption)
+''  PsCheckBox.bi  --  owner-drawn checkbox (Fluent box glyph + caption)
 ''
 
 #pragma once
 
-' ONE THING CBufferPaint COSTS THE HOST: GDI+'s Status enum defines Ok = 0 in namespace
+' ONE THING PsBufferPaint COSTS THE HOST: GDI+'s Status enum defines Ok = 0 in namespace
 ' AfxNova, and every host in this family says "using AfxNova" -- so ANY identifier named "ok"
 ' becomes a duplicate definition. The family convention is bOK.
-#include once "CBufferPaint.bi"
+#include once "PsBufferPaint.bi"
 
 ' Polling timer that guarantees hot-tracking is cleared when the mouse leaves the control.
 ' WM_MOUSELEAVE (TME_LEAVE) is not reliably delivered on fast exits, so a periodic cursor
 ' check acts as a safety net. Timer IDs are per-window, so every instance can share this id.
-' Distinct from CButton's &hCB90 and CToggle's &hCB70 purely as a debugging courtesy -- nothing
+' Distinct from PsButton's &hCB90 and PsToggle's &hCB70 purely as a debugging courtesy -- nothing
 ' requires it, since the ids never share a window.
 #define IDT_CCHECKBOX_HOTTRACK   &hCBA0
-#define CCHECKBOX_HOTTRACK_MS    100
+#define PSCHECKBOX_HOTTRACK_MS    100
 
 ' The two Segoe Fluent Icons codepoints the control draws by default.
 '
@@ -23,7 +23,7 @@
 '   E73A  CheckboxComposite  the same square with a tick in it
 '
 ' These are the pair tiko has shipped for years (modDeclares.bi), so they are confirmed by use
-' rather than read off a chart. BOTH ARE SETTABLE -- see CCheckBox_SetGlyphUnchecked. The
+' rather than read off a chart. BOTH ARE SETTABLE -- see PsCheckBox_SetGlyphUnchecked. The
 ' control has no opinion about which font supplies them; it draws the string it is given with
 ' the HFONT it is handed.
 '
@@ -35,39 +35,39 @@
 ' Written as \u ESCAPES, not as literal characters: this file has no BOM, and fbc reads a
 ' BOM-less source as bytes -- a literal U+E739 pasted in here would arrive as its three UTF-8
 ' bytes and draw three garbage glyphs. tiko writes them the same way for the same reason.
-#define CCHECKBOX_GLYPH_UNCHECKED  !"\uE739"
-#define CCHECKBOX_GLYPH_CHECKED    !"\uE73A"
+#define PSCHECKBOX_GLYPH_UNCHECKED  !"\uE739"
+#define PSCHECKBOX_GLYPH_CHECKED    !"\uE73A"
 
 ' Default geometry. Everything except nFocusThick is DPI-scaled once at Create; every setter
 ' afterwards takes raw pixels and the caller scales (the family rule).
 '
-' The padding is deliberately SMALL. Unlike CButton this control draws no chrome, so padding is
+' The padding is deliberately SMALL. Unlike PsButton this control draws no chrome, so padding is
 ' not the visual inset of a button face -- it is only breathing room around the content, and it
 ' matters mainly to a host that opts into a hover row highlight by setting BackColorHot. There
 ' is no reference screenshot for this control, so these are a judgement call.
-#define CCHECKBOX_DEFAULT_PADLEFT     4
-#define CCHECKBOX_DEFAULT_PADTOP      2
-#define CCHECKBOX_DEFAULT_PADRIGHT    4
-#define CCHECKBOX_DEFAULT_PADBOTTOM   2
+#define PSCHECKBOX_DEFAULT_PADLEFT     4
+#define PSCHECKBOX_DEFAULT_PADTOP      2
+#define PSCHECKBOX_DEFAULT_PADRIGHT    4
+#define PSCHECKBOX_DEFAULT_PADBOTTOM   2
 ' Gap between the box cell and the caption. Spent ONLY when there is a caption to separate the
 ' box from -- a caption-less checkbox charges padding + box + padding and nothing else.
-#define CCHECKBOX_DEFAULT_BOXGAP      8
-' The box cell. DECLARED, never measured (CIconPanel's rule): the glyph font is a paint-time
+#define PSCHECKBOX_DEFAULT_BOXGAP      8
+' The box cell. DECLARED, never measured (PsIconPanel's rule): the glyph font is a paint-time
 ' input, so a glyph too large for the cell simply clips rather than resizing the control.
-#define CCHECKBOX_DEFAULT_BOXWIDTH   16
-#define CCHECKBOX_DEFAULT_BOXHEIGHT  16
-#define CCHECKBOX_DEFAULT_FOCUSGAP    2
-#define CCHECKBOX_DEFAULT_FOCUSCURV   4     ' ellipse DIAMETER, not a radius
-#define CCHECKBOX_DEFAULT_FOCUSTHICK  1     ' not DPI-scaled
+#define PSCHECKBOX_DEFAULT_BOXWIDTH   16
+#define PSCHECKBOX_DEFAULT_BOXHEIGHT  16
+#define PSCHECKBOX_DEFAULT_FOCUSGAP    2
+#define PSCHECKBOX_DEFAULT_FOCUSCURV   4     ' ellipse DIAMETER, not a radius
+#define PSCHECKBOX_DEFAULT_FOCUSTHICK  1     ' not DPI-scaled
 
 
 ' Which side of the caption the box sits on.
 '
 ' THE BOX CELL IS PINNED TO THE PADDING on whichever side it is given, and the caption takes the
-' whole SPAN left over -- exactly the way CButton pins its icon cells and CComboBox its chevron.
+' whole SPAN left over -- exactly the way PsButton pins its icon cells and PsComboBox its chevron.
 ' That single model gives both looks, decided by nothing but how the host sizes the control:
 '
-'   sized to CCheckBox_GetIdealSize   [x] Enable dark mode          packed
+'   sized to PsCheckBox_GetIdealSize   [x] Enable dark mode          packed
 '   sized to a full row width         Enable dark mode         [x]  settings row
 '
 ' So a column of BOXALIGN_RIGHT checkboxes all sized to the same width line their boxes up for
@@ -80,16 +80,16 @@ end enum
 ' Where the caption sits WITHIN ITS SPAN -- which is the leftover after the box cell and the
 ' padding, not the control. With BOXALIGN_LEFT and CHK_TEXTALIGN_RIGHT on an over-wide control
 ' the caption goes to the right-hand end of the span, not to the right-hand end of the window.
-' (CButton's rcText carries the identical caveat and it is the natural thing to get wrong.)
+' (PsButton's rcText carries the identical caveat and it is the natural thing to get wrong.)
 enum
     CHK_TEXTALIGN_LEFT = 0
     CHK_TEXTALIGN_CENTER
     CHK_TEXTALIGN_RIGHT
 end enum
 
-' Which of the four colour sets the painter uses. Produced by CCheckBox_ResolveMood, which is a
-' PURE FUNCTION precisely so its truth table can be asserted (CScrollPanel_ShouldShow's and
-' CButton_ResolveMood's precedent) rather than only inspected inside a paint.
+' Which of the four colour sets the painter uses. Produced by PsCheckBox_ResolveMood, which is a
+' PURE FUNCTION precisely so its truth table can be asserted (PsScrollPanel_ShouldShow's and
+' PsButton_ResolveMood's precedent) rather than only inspected inside a paint.
 '
 ' isChecked is deliberately NOT a mood. It selects between two BOX colours within whichever mood
 ' resolved, so it survives all four for free instead of doubling the matrix.
@@ -100,8 +100,8 @@ enum
     CHK_MOOD_DISABLED
 end enum
 
-' Which rect the two offscreen probes look at. See CCheckBox_CountRenderedTones and
-' CCheckBox_HashRenderedPart for why they exist.
+' Which rect the two offscreen probes look at. See PsCheckBox_CountRenderedTones and
+' PsCheckBox_HashRenderedPart for why they exist.
 enum
     CHK_PART_CONTROL = 0
     CHK_PART_BOX
@@ -114,19 +114,19 @@ end enum
 ' FOUR MOODS, precedence  disabled > pressed > hot > idle.
 '
 ' THE CONTROL READS COMPLETELY FLAT BY DEFAULT because BackColorHot, BackColorPressed and
-' BackColorDisabled are all defaulted EQUAL to BackColor -- the same trick CSelectBar uses for
-' its hot cell and CComboBox for its border. Hovering therefore changes only the box and the
+' BackColorDisabled are all defaulted EQUAL to BackColor -- the same trick PsSelectBar uses for
+' its hot cell and PsComboBox for its border. Hovering therefore changes only the box and the
 ' caption, which is what a checkbox in a settings pane should do. A host that wants a
 ' menu-style highlight across the whole row sets ONE field and gets it.
 '
 ' THE BOX HAS TWO COLOUR SETS, one per checked state, because the composite glyph is a single
 ' piece of ink: an unchecked box wants to read as a muted outline and a checked one as an
-' accent. There is no separate "tick colour" -- see the note above CCHECKBOX_GLYPH_UNCHECKED.
+' accent. There is no separate "tick colour" -- see the note above PSCHECKBOX_GLYPH_UNCHECKED.
 '
 ' THERE IS NO REFERENCE SCREENSHOT for this control. These defaults are INHERITED from
-' CBUTTON_COLORS and CTOGGLE_COLORS and then accepted by eye, which is a weaker claim than
+' PSBUTTON_COLORS and PSTOGGLE_COLORS and then accepted by eye, which is a weaker claim than
 ' "matched to a design" and is worth keeping distinct.
-type CCHECKBOX_COLORS
+type PSCHECKBOX_COLORS
     ' --- the control's own background, per mood. All four equal by default (see above). ---
     BackColor               as COLORREF = BGR( 33, 37, 43)
     BackColorHot            as COLORREF = BGR( 33, 37, 43)   ' = BackColor
@@ -155,9 +155,9 @@ end type
 ' Everything the painter needs. All four rects are precomputed by LayoutCheckBox -- never
 ' re-derive one from another, and in particular never re-apply the padding to rcContent to get
 ' rcText, because the box cell, the box gap and the box ALIGNMENT can all change underneath you.
-type CCHECKBOX_PAINTINFO
+type PSCHECKBOX_PAINTINFO
     hCheckBox   as HWND              ' the control, so the callback can query it
-    b           as CBufferPaint ptr  ' the control's buffer for this repaint (no copy)
+    b           as PsBufferPaint ptr  ' the control's buffer for this repaint (no copy)
     ' --- Geometry, all precomputed by LayoutCheckBox ---
     rcClient    as RECT              ' the whole client area
     rcContent   as RECT              ' rcClient deflated by the focus-ring band
@@ -187,7 +187,7 @@ type CCHECKBOX_PAINTINFO
     nTextAlign  as long              ' CHK_TEXTALIGN_*; map to DT_LEFT / DT_CENTER / DT_RIGHT
 end type
 
-type CCHECKBOX_MESSAGEINFO
+type PSCHECKBOX_MESSAGEINFO
     hCheckBox   as HWND
     uMsg        as UINT
     wParam      as WPARAM
@@ -203,25 +203,25 @@ end type
 ' background.
 '
 ' TWO CONTRACTS WORTH HONOURING:
-'   - Draw the caption with the SAME font you handed to CCheckBox_SetFont. The ideal width was
+'   - Draw the caption with the SAME font you handed to PsCheckBox_SetFont. The ideal width was
 '     measured with it, and a different font means the width lies.
 '   - DO NOT reach for PaintBorderRect to draw a frame or a focus ring. It FILLS
 '     unconditionally, so used as an outline it erases everything beneath it -- a mistake this
-'     family has now made three separate times (CToggle, CComboBox, CNumericUpDown), every time
+'     family has now made three separate times (PsToggle, PsComboBox, PsNumericUpDown), every time
 '     by copying a sibling's callback. PaintRoundOutline is the one that strokes without
-'     filling. CCheckBox_CountRenderedTones exists so you can ASSERT you have not done it.
-type CHK_PaintCallbackSub as sub( byval p as CCHECKBOX_PAINTINFO ptr )
+'     filling. PsCheckBox_CountRenderedTones exists so you can ASSERT you have not done it.
+type CHK_PaintCallbackSub as sub( byval p as PSCHECKBOX_PAINTINFO ptr )
 
 ' Observe messages. Return TRUE if you handled it and want the control's default handling
 ' suppressed, FALSE to let it proceed.
 '
-' Like CToggle, CComboBox and CButton -- and unlike the mouse-only siblings -- this control hands
+' Like PsToggle, PsComboBox and PsButton -- and unlike the mouse-only siblings -- this control hands
 ' over the FOCUS and KEYBOARD messages as well as the mouse ones, because they carry real state.
 '
 ' CAUTION: the result is IGNORED for three messages.
 '   WM_LBUTTONUP        - the control holds mouse capture across a press and the up-message is
 '                         what releases it: a callback that suppressed it would strand capture
-'                         and route every subsequent click to this control (the CListBox bug
+'                         and route every subsequent click to this control (the PsListBox bug
 '                         recorded in Learnings.md). Suppressing WM_LBUTTONDOWN suppresses the
 '                         press, never the capture bookkeeping.
 '   WM_SETFOCUS         - focus is a FACT the system reports, not an action to veto. The state
@@ -229,27 +229,27 @@ type CHK_PaintCallbackSub as sub( byval p as CCHECKBOX_PAINTINFO ptr )
 '                         to suppress. A host that does not want the control focusable must not
 '                         make it a tabstop.
 ' For every other message TRUE suppresses the control's default handling.
-type CHK_MessageCallbackFunc as function( byval m as CCHECKBOX_MESSAGEINFO ptr ) as boolean
+type CHK_MessageCallbackFunc as function( byval m as PSCHECKBOX_MESSAGEINFO ptr ) as boolean
 
 ' Supply the tooltip text on demand (only when a tip is about to show). Consulted ONLY when the
 ' control has no tooltip text of its own. Return "" for no tooltip.
 '
 ' THERE IS NO CAPTION FALLBACK. A checkbox whose caption is already on screen would otherwise pop
 ' a tip that just repeats what you are looking at, so a control with neither its own text nor a
-' callback answer simply shows nothing. (CStatusBar and CTabBar do fall back to the caption;
+' callback answer simply shows nothing. (PsStatusBar and PsTabBar do fall back to the caption;
 ' that is their call, made for controls whose text is often truncated.)
 type CHK_TooltipCallbackFunc as function( byval hCheckBox as HWND ) as DWSTRING
 
 ' The checked state changed through USER interaction -- a completed click, or Space/Enter, or
-' the programmatic CCheckBox_Toggle (which is an ACTION, not a setter; see that function).
-' Fired AFTER the control's state is updated, so CCheckBox_GetChecked() = isChecked.
+' the programmatic PsCheckBox_Toggle (which is an ACTION, not a setter; see that function).
+' Fired AFTER the control's state is updated, so PsCheckBox_GetChecked() = isChecked.
 '
-' The programmatic CCheckBox_SetChecked does NOT fire this (Win32's BM_SETCHECK / BN_CLICKED
+' The programmatic PsCheckBox_SetChecked does NOT fire this (Win32's BM_SETCHECK / BN_CLICKED
 ' precedent), which is also what makes it safe to call SetChecked from inside this handler.
 type CHK_CheckChangedCallbackSub as sub( byval hCheckBox as HWND, byval isChecked as boolean )
 
 
-type CCHECKBOX
+type PSCHECKBOX
     hWin              as HWND
     hToolTip          as HWND
     ' Instance-lifetime buffer that TTN_GETDISPINFOW's lpszText is pointed at. It must NOT be
@@ -262,7 +262,7 @@ type CCHECKBOX
     HoverTime         as long = 250
     ' --- Content ---
     wszText           as DWSTRING        ' the caption. "" = no caption (and no gap spent)
-    ' The two box glyphs. Seeded by CCheckBox_Create, NOT by a field initializer here: a DWSTRING
+    ' The two box glyphs. Seeded by PsCheckBox_Create, NOT by a field initializer here: a DWSTRING
     ' member cannot carry one (it is a UDT with its own constructors), and the family's
     ' Create-does-the-defaults shape is where every other string default lives anyway.
     wszGlyphUnchecked as DWSTRING
@@ -286,14 +286,14 @@ type CCHECKBOX
     '     callback may suppress an up-message.
     '     There is no bPressedInside flag: "the cursor is still inside" is exactly isHot, and
     '     hover tracking already maintains that through the capture. ---
-    colors            as CCHECKBOX_COLORS
+    colors            as PSCHECKBOX_COLORS
     ' Caller-supplied fonts (caller owns both). NOT named hFont: FreeBASIC is case-insensitive,
     ' so a member called hFont would shadow the TYPE name HFONT inside every member procedure of
     ' this type, and "dim as HFONT x" there fails with a misleading "error 14: Expected
     ' identifier, found 'HFONT'". See C:\dev\Learnings.md.
     '
     ' TWO fonts, because the caption font is never the icon font. hTextFont is the MEASURING
-    ' font and drives the layout; hGlyphFont is a paint-time input only (CIconPanel's rule) and
+    ' font and drives the layout; hGlyphFont is a paint-time input only (PsIconPanel's rule) and
     ' changing it repaints without re-laying-out.
     hTextFont         as HFONT
     hGlyphFont        as HFONT
@@ -301,18 +301,18 @@ type CCHECKBOX
     nBoxAlign         as long = CHK_BOXALIGN_LEFT
     nTextAlign        as long = CHK_TEXTALIGN_LEFT
     bAutoSize         as boolean = false   ' opt-in: the control SetWindowPos's ITSELF
-    nPadLeft          as long = CCHECKBOX_DEFAULT_PADLEFT
-    nPadTop           as long = CCHECKBOX_DEFAULT_PADTOP
-    nPadRight         as long = CCHECKBOX_DEFAULT_PADRIGHT
-    nPadBottom        as long = CCHECKBOX_DEFAULT_PADBOTTOM
-    nBoxGap           as long = CCHECKBOX_DEFAULT_BOXGAP
+    nPadLeft          as long = PSCHECKBOX_DEFAULT_PADLEFT
+    nPadTop           as long = PSCHECKBOX_DEFAULT_PADTOP
+    nPadRight         as long = PSCHECKBOX_DEFAULT_PADRIGHT
+    nPadBottom        as long = PSCHECKBOX_DEFAULT_PADBOTTOM
+    nBoxGap           as long = PSCHECKBOX_DEFAULT_BOXGAP
     ' NOTE: "width" is a FreeBASIC reserved word (see C:\dev\Learnings.md) and produces errors
     ' that never name the real problem -- hence nBoxWidth throughout.
-    nBoxWidth         as long = CCHECKBOX_DEFAULT_BOXWIDTH
-    nBoxHeight        as long = CCHECKBOX_DEFAULT_BOXHEIGHT
-    nFocusGap         as long = CCHECKBOX_DEFAULT_FOCUSGAP
-    nFocusCurvature   as long = CCHECKBOX_DEFAULT_FOCUSCURV   ' ellipse DIAMETER
-    nFocusThick       as long = CCHECKBOX_DEFAULT_FOCUSTHICK  ' NOT DPI-scaled
+    nBoxWidth         as long = PSCHECKBOX_DEFAULT_BOXWIDTH
+    nBoxHeight        as long = PSCHECKBOX_DEFAULT_BOXHEIGHT
+    nFocusGap         as long = PSCHECKBOX_DEFAULT_FOCUSGAP
+    nFocusCurvature   as long = PSCHECKBOX_DEFAULT_FOCUSCURV   ' ellipse DIAMETER
+    nFocusThick       as long = PSCHECKBOX_DEFAULT_FOCUSTHICK  ' NOT DPI-scaled
     ' --- Layout outputs. Rects are DERIVED, never set from outside; LayoutCheckBox() owns them.
     '     Layout is lazy: mutators mark it dirty, the next paint (or any rect/size query) runs
     '     it, which coalesces a burst of mutations into ONE measuring pass. ---
@@ -322,7 +322,7 @@ type CCHECKBOX
     nIdealH           as long = 0     ' derived
     rcContent         as RECT         ' derived
     rcBox             as RECT         ' derived
-    rcText            as RECT         ' derived -- the SPAN, see CCHECKBOX_PAINTINFO
+    rcText            as RECT         ' derived -- the SPAN, see PSCHECKBOX_PAINTINFO
     rcVisual          as RECT         ' derived
     bLayoutDirty      as boolean = true
     PaintCallback        as CHK_PaintCallbackSub          ' optional; replaces the built-in painter
@@ -342,21 +342,21 @@ end type
 ' The distance the visual bounds extend beyond the content on every side. The focus ring is
 ' drawn INSIDE this band, and the band is reserved UNCONDITIONALLY -- whether or not the control
 ' currently has focus -- which is what stops the content jumping when focus arrives. It
-' therefore contributes to the IDEAL SIZE (CToggle's rule).
-function CCHECKBOX.RingPad() as long
+' therefore contributes to the IDEAL SIZE (PsToggle's rule).
+function PSCHECKBOX.RingPad() as long
     return this.nFocusGap + this.nFocusThick
 end function
 
 ' "Is there a caption at all". A named member rather than an inline len() check because the
 ' layout, the painter and the ideal-size arithmetic must all agree about it, and three copies of
 ' `len(x) > 0` is three places to disagree.
-function CCHECKBOX.HasText() as boolean
+function PSCHECKBOX.HasText() as boolean
     return (len( this.wszText ) > 0)
 end function
 
 ' Which glyph does the current state call for? ONE place, so the painter, the PAINTINFO handed
 ' to a paint callback and the self-test's render probe cannot pick differently.
-function CCHECKBOX.ResolveGlyph() as DWSTRING
+function PSCHECKBOX.ResolveGlyph() as DWSTRING
     dim as DWSTRING wszOut
     if this.isChecked then
         wszOut = this.wszGlyphChecked
@@ -370,13 +370,13 @@ end function
 ' Forget any live press WITHOUT touching the capture. Releasing capture is the WndProc's job,
 ' and only on the up-message or WM_DESTROY -- doing it here would let a callback strand or
 ' double-release it.
-sub CCHECKBOX.CancelPress()
+sub PSCHECKBOX.CancelPress()
     this.isPressed = false
 end sub
 
 ' Mark the layout stale and request a repaint. Every mutator routes through here, which is what
 ' makes layout lazy: a burst of setters costs one measuring pass, not N.
-sub CCHECKBOX.Refresh()
+sub PSCHECKBOX.Refresh()
     this.bLayoutDirty = true
     ' Repaint WITH background erase so a region vacated by a shrinking control is cleared.
     if this.hWin then InvalidateRect( this.hWin, NULL, TRUE )
@@ -410,7 +410,7 @@ end sub
 ' THE GAP IS SPENT ONLY WHEN THERE IS A CAPTION TO SEPARATE FROM. A caption-less checkbox charges
 ' padLeft + box + padRight, so the glyph sits properly centred in its own padding instead of
 ' being pushed off-centre by a gap with nothing on the other side of it. Same reasoning as
-' CButton's icon-only button and CComboBox's arrow-only mode.
+' PsButton's icon-only button and PsComboBox's arrow-only mode.
 '
 ' AN ABSENT CAPTION GIVES AN EMPTY rcText, not a zero-width one tucked against an edge. A paint
 ' callback can therefore test IsRectEmpty rather than having to re-derive presence from the
@@ -422,16 +422,16 @@ end sub
 ' rather than having a phantom text height baked in here.
 '
 ' WHY THE MEASURING PASS RUNS BEFORE THE ZERO-CLIENT BAIL: nIdealW/nIdealH do not depend on the
-' client area at all, and CCheckBox_GetIdealSize is exactly what a host calls to decide how big
+' client area at all, and PsCheckBox_GetIdealSize is exactly what a host calls to decide how big
 ' to make the control in the FIRST place. Returning 0 until it had already been sized would be a
-' chicken-and-egg trap (CButton and CComboBox dodge it by this same ordering).
+' chicken-and-egg trap (PsButton and PsComboBox dodge it by this same ordering).
 '
 ' OVERFLOW: when the client is smaller than ideal the rects are computed HONESTLY rather than
-' squeezed (CIconPanel's and CTabBar's rule) -- the box keeps its declared size and stays pinned
+' squeezed (PsIconPanel's and PsTabBar's rule) -- the box keeps its declared size and stays pinned
 ' to its padding, and rcText is what collapses, clamped to EMPTY rather than going negative. So
 ' a too-narrow checkbox loses its caption to the ellipsis and keeps its box, which is the useful
 ' failure. Vertically a client shorter than contentH clips rather than deforming.
-sub CCHECKBOX.LayoutCheckBox()
+sub PSCHECKBOX.LayoutCheckBox()
     this.bLayoutDirty = false
     if this.hWin = 0 then exit sub
 
@@ -538,10 +538,10 @@ end sub
 ' Which colour set does this state call for?  disabled > pressed > hot > idle.
 '
 ' A PURE FUNCTION on purpose: it takes no control pointer and touches no global, so its whole
-' truth table can be asserted directly (CScrollPanel_ShouldShow's precedent) instead of only
+' truth table can be asserted directly (PsScrollPanel_ShouldShow's precedent) instead of only
 ' being observable from inside a WM_PAINT. The painter and the self-test call the same one.
 ' ========================================================================================
-function CCheckBox_ResolveMood( _
+function PsCheckBox_ResolveMood( _
             byval isEnabled as boolean, _
             byval isPressed as boolean, _
             byval isHot     as boolean _
@@ -557,13 +557,13 @@ end function
 ' ========================================================================================
 ' Turn a mood plus the checked flag into the three colours the painter uses.
 '
-' Split out of the painter for the same reason as CCheckBox_ResolveMood: "isChecked changes the
+' Split out of the painter for the same reason as PsCheckBox_ResolveMood: "isChecked changes the
 ' BOX colour and nothing else" has to hold in EVERY mood, and that is a claim worth asserting
 ' rather than eyeballing in eight screenshots. The checked test is applied INSIDE each mood arm
 ' rather than as a fifth mood, which is what keeps it one rule rather than four.
 ' ========================================================================================
-sub CCheckBox_ResolveColors( _
-            byval pColors   as CCHECKBOX_COLORS ptr, _
+sub PsCheckBox_ResolveColors( _
+            byval pColors   as PSCHECKBOX_COLORS ptr, _
             byval nMood     as long, _
             byval isChecked as boolean, _
             byref clrBack   as COLORREF, _
@@ -634,9 +634,9 @@ end sub
 '   custom paint callback, but the CONTROL will still only track two.
 '
 ' NO MNEMONICS
-'   "&Enable" draws a literal ampersand -- CBufferPaint.PaintText forces DT_NOPREFIX, so this is
+'   "&Enable" draws a literal ampersand -- PsBufferPaint.PaintText forces DT_NOPREFIX, so this is
 '   enforced by the renderer rather than merely intended, and PaintTextEx forces it too. A host
-'   wanting Alt+E wires its own accelerator and calls CCheckBox_Toggle().
+'   wanting Alt+E wires its own accelerator and calls PsCheckBox_Toggle().
 '
 ' NO MULTILINE
 '   One line, ellipsized into the caption span. Wrapping would make the ideal HEIGHT depend on
@@ -644,33 +644,33 @@ end sub
 '   guarantee -- the property the whole family's layout leans on.
 '
 ' IT IS FOCUSABLE
-'   WS_TABSTOP, real focus tracking, a painted focus ring, and Space/Enter activation. CToggle,
-'   CComboBox and CButton are the other focusable siblings; the rest of the family is mouse-only.
+'   WS_TABSTOP, real focus tracking, a painted focus ring, and Space/Enter activation. PsToggle,
+'   PsComboBox and PsButton are the other focusable siblings; the rest of the family is mouse-only.
 '   Tab NAVIGATION needs IsDialogMessage in the host pump -- and the host must SetFocus its first
 '   control, because IsDialogMessage ignores Tab until a child already has focus. Without either,
 '   mouse and (once the control has focus) keyboard both still work.
 '
 '   ENTER ACTIVATES, WHICH DEPARTS FROM REAL WIN32. A system checkbox toggles on Space only and
 '   lets Enter fall through to the dialog's default button. This control takes both, matching
-'   CToggle and CButton, so that the family behaves one way rather than three. It is a deliberate
+'   PsToggle and PsButton, so that the family behaves one way rather than three. It is a deliberate
 '   choice, not drift: a host that wants Enter to reach its OK button should not put focus on a
 '   checkbox, or should intercept WM_KEYDOWN through the message callback.
 '
 ' THERE IS NO PUMP OBLIGATION
-'   Unlike CComboBox, CNumericUpDown and CTextBox there is no CCheckBox_FilterMessage: this
+'   Unlike PsComboBox, PsNumericUpDown and PsTextBox there is no PsCheckBox_FilterMessage: this
 '   control owns no second top-level window and no popup, so nothing needs intercepting ahead of
 '   the dispatch.
 '
 ' THE CONTROL HANDLE
-'   Every CCheckBox_* function takes the handle returned by CCheckBox_Create(). It is a real HWND
+'   Every PsCheckBox_* function takes the handle returned by PsCheckBox_Create(). It is a real HWND
 '   on purpose (not an opaque type): callers legitimately need to treat the control as a window,
 '   e.g. SetWindowPos() to place and size it.
 '
-' THERE IS NO CCheckBox_HitTest
+' THERE IS NO PsCheckBox_HitTest
 '   The whole client rect is the hit area -- clicking the caption toggles, exactly as a system
 '   checkbox does -- so a hit test could only ever be PtInRect(client), a function that returns
 '   TRUE for exactly the points the caller already knows are inside. Its absence is a decision,
-'   not an omission (CToggle's and CButton's reasoning).
+'   not an omission (PsToggle's and PsButton's reasoning).
 '
 ' LIFETIME
 '   The control frees itself when its window is destroyed, and destroys its tooltip with it. The
@@ -680,10 +680,10 @@ end sub
 ' Creation
 '   CtrlID becomes the control window's id (GWLP_ID), so hosts can find it with GetDlgItem.
 '   There are no child controls. The control is created zero-sized: size it with
-'   CCheckBox_GetIdealSize and position it with SetWindowPos() -- or turn on
-'   CCheckBox_SetAutoSize and let it size itself.
+'   PsCheckBox_GetIdealSize and position it with SetWindowPos() -- or turn on
+'   PsCheckBox_SetAutoSize and let it size itself.
 ' ----------------------------------------------------------------------------------------
-declare function CCheckBox_Create( byval hWndParent as HWND, byval CtrlID as long ) as HWND
+declare function PsCheckBox_Create( byval hWndParent as HWND, byval CtrlID as long ) as HWND
 
 ' ----------------------------------------------------------------------------------------
 ' Content.  All of these are SILENT: they change what is drawn, never what was clicked.
@@ -691,7 +691,7 @@ declare function CCheckBox_Create( byval hWndParent as HWND, byval CtrlID as lon
 '   SetText is also reachable as the WINDOW TEXT -- the control handles WM_SETTEXT, WM_GETTEXT
 '     and WM_GETTEXTLENGTH against this same store, so SetWindowText / GetWindowText work and
 '     generic code that walks children and reads their text sees a real caption. One store, two
-'     doors. (Only CButton does this too; it is here because a checkbox meets generic dialog
+'     doors. (Only PsButton does this too; it is here because a checkbox meets generic dialog
 '     code just as often.)
 '   SetGlyphUnchecked / SetGlyphChecked take the codepoint(s) to draw for each state. Passing ""
 '     draws nothing for that state, which is legal but leaves the control looking broken -- the
@@ -699,22 +699,22 @@ declare function CCheckBox_Create( byval hWndParent as HWND, byval CtrlID as lon
 '   SetID sets the value stored for the host's convenience. It is a HOST PAYLOAD and is never
 '     used as a command id by this control, so it cannot collide with anything.
 ' ----------------------------------------------------------------------------------------
-declare function CCheckBox_GetText( byval hCheckBox as HWND ) as DWSTRING
-declare sub      CCheckBox_SetText( byval hCheckBox as HWND, byval Text as DWSTRING )
-declare function CCheckBox_GetGlyphUnchecked( byval hCheckBox as HWND ) as DWSTRING
-declare sub      CCheckBox_SetGlyphUnchecked( byval hCheckBox as HWND, byval Glyph as DWSTRING )
-declare function CCheckBox_GetGlyphChecked( byval hCheckBox as HWND ) as DWSTRING
-declare sub      CCheckBox_SetGlyphChecked( byval hCheckBox as HWND, byval Glyph as DWSTRING )
-declare function CCheckBox_GetID( byval hCheckBox as HWND ) as long
-declare sub      CCheckBox_SetID( byval hCheckBox as HWND, byval id as long )
-declare function CCheckBox_GetItemData( byval hCheckBox as HWND ) as integer
-declare sub      CCheckBox_SetItemData( byval hCheckBox as HWND, byval itemData as integer )
+declare function PsCheckBox_GetText( byval hCheckBox as HWND ) as DWSTRING
+declare sub      PsCheckBox_SetText( byval hCheckBox as HWND, byval Text as DWSTRING )
+declare function PsCheckBox_GetGlyphUnchecked( byval hCheckBox as HWND ) as DWSTRING
+declare sub      PsCheckBox_SetGlyphUnchecked( byval hCheckBox as HWND, byval Glyph as DWSTRING )
+declare function PsCheckBox_GetGlyphChecked( byval hCheckBox as HWND ) as DWSTRING
+declare sub      PsCheckBox_SetGlyphChecked( byval hCheckBox as HWND, byval Glyph as DWSTRING )
+declare function PsCheckBox_GetID( byval hCheckBox as HWND ) as long
+declare sub      PsCheckBox_SetID( byval hCheckBox as HWND, byval id as long )
+declare function PsCheckBox_GetItemData( byval hCheckBox as HWND ) as integer
+declare sub      PsCheckBox_SetItemData( byval hCheckBox as HWND, byval itemData as integer )
 
 ' ----------------------------------------------------------------------------------------
 ' State.
 '
 '   SetChecked is SILENT -- the change callback fires only for user interaction (a completed
-'     click, or Space/Enter) and for CCheckBox_Toggle below, following Win32's BM_SETCHECK /
+'     click, or Space/Enter) and for PsCheckBox_Toggle below, following Win32's BM_SETCHECK /
 '     BN_CLICKED precedent. That is also what stops a host calling SetChecked from inside its own
 '     handler from recursing. It never re-measures: the two glyphs share one declared cell.
 '
@@ -725,28 +725,28 @@ declare sub      CCheckBox_SetItemData( byval hCheckBox as HWND, byval itemData 
 '     ticked, which is why the colour struct carries a disabled colour for each state.
 '
 '   GetFocused answers for this window directly (there is no child to hold focus, unlike
-'     CNumericUpDown where GetFocus() = hCtrl is never true).
+'     PsNumericUpDown where GetFocus() = hCtrl is never true).
 ' ----------------------------------------------------------------------------------------
-declare function CCheckBox_GetChecked( byval hCheckBox as HWND ) as boolean
-declare sub      CCheckBox_SetChecked( byval hCheckBox as HWND, byval isChecked as boolean )
-declare function CCheckBox_GetEnabled( byval hCheckBox as HWND ) as boolean
-declare sub      CCheckBox_SetEnabled( byval hCheckBox as HWND, byval isEnabled as boolean )
-declare function CCheckBox_GetFocused( byval hCheckBox as HWND ) as boolean
-declare sub      CCheckBox_Refresh( byval hCheckBox as HWND )
+declare function PsCheckBox_GetChecked( byval hCheckBox as HWND ) as boolean
+declare sub      PsCheckBox_SetChecked( byval hCheckBox as HWND, byval isChecked as boolean )
+declare function PsCheckBox_GetEnabled( byval hCheckBox as HWND ) as boolean
+declare sub      PsCheckBox_SetEnabled( byval hCheckBox as HWND, byval isEnabled as boolean )
+declare function PsCheckBox_GetFocused( byval hCheckBox as HWND ) as boolean
+declare sub      PsCheckBox_Refresh( byval hCheckBox as HWND )
 
 ' ----------------------------------------------------------------------------------------
 ' Action.
 '
-'   CCheckBox_Toggle FLIPS the state and FIRES CheckChangedCallback, and that is a DELIBERATE
+'   PsCheckBox_Toggle FLIPS the state and FIRES CheckChangedCallback, and that is a DELIBERATE
 '   EXCEPTION to the family's "programmatic setters are silent" rule. It is an ACTION, not a
 '   state setter -- Win32's BM_CLICK sends BN_CLICKED too -- and with no mnemonics parsed by this
 '   control it is the door a host's accelerator uses. A silent version already exists, and is
-'   called CCheckBox_SetChecked.
+'   called PsCheckBox_SetChecked.
 '
 '   The call is refused on a disabled control, exactly as a real click would be. Note it does NOT
 '   paint a press flash: it reports an action, it does not animate one.
 ' ----------------------------------------------------------------------------------------
-declare sub      CCheckBox_Toggle( byval hCheckBox as HWND )
+declare sub      PsCheckBox_Toggle( byval hCheckBox as HWND )
 
 ' ----------------------------------------------------------------------------------------
 ' Layout.  ALL setters take RAW PIXELS -- the caller DPI-scales (the family rule; only the
@@ -764,7 +764,7 @@ declare sub      CCheckBox_Toggle( byval hCheckBox as HWND )
 '   SetFocusRing sets the gap from the content to the ring and the ring's own thickness. Both are
 '     reserved unconditionally, focused or not, so nothing jumps when focus arrives -- which
 '     means changing either changes the IDEAL SIZE.
-'   SetFocusCurvature takes an ellipse DIAMETER, not a radius: CBufferPaint keeps GDI's
+'   SetFocusCurvature takes an ellipse DIAMETER, not a radius: PsBufferPaint keeps GDI's
 '     vocabulary and halves it internally. 8 draws a 4px radius. 0 = square corners.
 '   SetAutoSize(true) makes the control SetWindowPos ITSELF (preserving its top-left) whenever
 '     something that changes the ideal size changes: caption, font, padding, box gap, box size,
@@ -779,27 +779,27 @@ declare sub      CCheckBox_Toggle( byval hCheckBox as HWND )
 '   the control has no geometry yet (created but never sized). rcText is EMPTY when there is no
 '   caption and the query still returns TRUE -- empty is the honest answer.
 ' ----------------------------------------------------------------------------------------
-declare function CCheckBox_GetBoxAlign( byval hCheckBox as HWND ) as long
-declare sub      CCheckBox_SetBoxAlign( byval hCheckBox as HWND, byval nBoxAlign as long )
-declare function CCheckBox_GetTextAlign( byval hCheckBox as HWND ) as long
-declare sub      CCheckBox_SetTextAlign( byval hCheckBox as HWND, byval nTextAlign as long )
-declare sub      CCheckBox_GetPadding( byval hCheckBox as HWND, byref nLeft as long, byref nTop as long, byref nRight as long, byref nBottom as long )
-declare sub      CCheckBox_SetPadding( byval hCheckBox as HWND, byval nLeft as long, byval nTop as long, byval nRight as long, byval nBottom as long )
-declare function CCheckBox_GetBoxGap( byval hCheckBox as HWND ) as long
-declare sub      CCheckBox_SetBoxGap( byval hCheckBox as HWND, byval nBoxGap as long )
-declare sub      CCheckBox_GetBoxSize( byval hCheckBox as HWND, byref nBoxWidth as long, byref nBoxHeight as long )
-declare sub      CCheckBox_SetBoxSize( byval hCheckBox as HWND, byval nBoxWidth as long, byval nBoxHeight as long )
-declare sub      CCheckBox_GetFocusRing( byval hCheckBox as HWND, byref nGap as long, byref nThickness as long )
-declare sub      CCheckBox_SetFocusRing( byval hCheckBox as HWND, byval nGap as long, byval nThickness as long )
-declare function CCheckBox_GetFocusCurvature( byval hCheckBox as HWND ) as long
-declare sub      CCheckBox_SetFocusCurvature( byval hCheckBox as HWND, byval nCurvature as long )
-declare function CCheckBox_GetAutoSize( byval hCheckBox as HWND ) as boolean
-declare sub      CCheckBox_SetAutoSize( byval hCheckBox as HWND, byval bAutoSize as boolean )
-declare sub      CCheckBox_GetIdealSize( byval hCheckBox as HWND, byref nWidth as long, byref nHeight as long )
-declare function CCheckBox_GetContentRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
-declare function CCheckBox_GetBoxRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
-declare function CCheckBox_GetTextRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
-declare function CCheckBox_GetVisualRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
+declare function PsCheckBox_GetBoxAlign( byval hCheckBox as HWND ) as long
+declare sub      PsCheckBox_SetBoxAlign( byval hCheckBox as HWND, byval nBoxAlign as long )
+declare function PsCheckBox_GetTextAlign( byval hCheckBox as HWND ) as long
+declare sub      PsCheckBox_SetTextAlign( byval hCheckBox as HWND, byval nTextAlign as long )
+declare sub      PsCheckBox_GetPadding( byval hCheckBox as HWND, byref nLeft as long, byref nTop as long, byref nRight as long, byref nBottom as long )
+declare sub      PsCheckBox_SetPadding( byval hCheckBox as HWND, byval nLeft as long, byval nTop as long, byval nRight as long, byval nBottom as long )
+declare function PsCheckBox_GetBoxGap( byval hCheckBox as HWND ) as long
+declare sub      PsCheckBox_SetBoxGap( byval hCheckBox as HWND, byval nBoxGap as long )
+declare sub      PsCheckBox_GetBoxSize( byval hCheckBox as HWND, byref nBoxWidth as long, byref nBoxHeight as long )
+declare sub      PsCheckBox_SetBoxSize( byval hCheckBox as HWND, byval nBoxWidth as long, byval nBoxHeight as long )
+declare sub      PsCheckBox_GetFocusRing( byval hCheckBox as HWND, byref nGap as long, byref nThickness as long )
+declare sub      PsCheckBox_SetFocusRing( byval hCheckBox as HWND, byval nGap as long, byval nThickness as long )
+declare function PsCheckBox_GetFocusCurvature( byval hCheckBox as HWND ) as long
+declare sub      PsCheckBox_SetFocusCurvature( byval hCheckBox as HWND, byval nCurvature as long )
+declare function PsCheckBox_GetAutoSize( byval hCheckBox as HWND ) as boolean
+declare sub      PsCheckBox_SetAutoSize( byval hCheckBox as HWND, byval bAutoSize as boolean )
+declare sub      PsCheckBox_GetIdealSize( byval hCheckBox as HWND, byref nWidth as long, byref nHeight as long )
+declare function PsCheckBox_GetContentRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
+declare function PsCheckBox_GetBoxRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
+declare function PsCheckBox_GetTextRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
+declare function PsCheckBox_GetVisualRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
 
 ' ----------------------------------------------------------------------------------------
 ' Appearance.  SetColors copies the whole struct. GetColors fills one out, so the
@@ -812,21 +812,21 @@ declare function CCheckBox_GetVisualRect( byval hCheckBox as HWND, byref rc as R
 '                  than measured. Unset falls back to the caption font -- which will draw the
 '                  codepoint as a missing-glyph box, so this one is worth setting.
 ' ----------------------------------------------------------------------------------------
-declare sub      CCheckBox_GetColors( byval hCheckBox as HWND, byval pColors as CCHECKBOX_COLORS ptr )
-declare sub      CCheckBox_SetColors( byval hCheckBox as HWND, byval pColors as CCHECKBOX_COLORS ptr )
-declare function CCheckBox_GetFont( byval hCheckBox as HWND ) as HFONT
-declare sub      CCheckBox_SetFont( byval hCheckBox as HWND, byval hTextFont as HFONT )
-declare function CCheckBox_GetGlyphFont( byval hCheckBox as HWND ) as HFONT
-declare sub      CCheckBox_SetGlyphFont( byval hCheckBox as HWND, byval hGlyphFont as HFONT )
+declare sub      PsCheckBox_GetColors( byval hCheckBox as HWND, byval pColors as PSCHECKBOX_COLORS ptr )
+declare sub      PsCheckBox_SetColors( byval hCheckBox as HWND, byval pColors as PSCHECKBOX_COLORS ptr )
+declare function PsCheckBox_GetFont( byval hCheckBox as HWND ) as HFONT
+declare sub      PsCheckBox_SetFont( byval hCheckBox as HWND, byval hTextFont as HFONT )
+declare function PsCheckBox_GetGlyphFont( byval hCheckBox as HWND ) as HFONT
+declare sub      PsCheckBox_SetGlyphFont( byval hCheckBox as HWND, byval hGlyphFont as HFONT )
 
 ' ----------------------------------------------------------------------------------------
 ' Tooltips.  The control's own text wins; the callback is consulted only when it is empty; with
 ' neither, no tip is shown -- there is no caption fallback (see CHK_TooltipCallbackFunc).
 ' ----------------------------------------------------------------------------------------
-declare function CCheckBox_GetTooltipText( byval hCheckBox as HWND ) as DWSTRING
-declare sub      CCheckBox_SetTooltipText( byval hCheckBox as HWND, byval Text as DWSTRING )
-declare function CCheckBox_GetTooltipHandle( byval hCheckBox as HWND ) as HWND
-declare sub      CCheckBox_SetHoverTime( byval hCheckBox as HWND, byval milliseconds as long )
+declare function PsCheckBox_GetTooltipText( byval hCheckBox as HWND ) as DWSTRING
+declare sub      PsCheckBox_SetTooltipText( byval hCheckBox as HWND, byval Text as DWSTRING )
+declare function PsCheckBox_GetTooltipHandle( byval hCheckBox as HWND ) as HWND
+declare sub      PsCheckBox_SetHoverTime( byval hCheckBox as HWND, byval milliseconds as long )
 
 ' ----------------------------------------------------------------------------------------
 ' Callbacks.  See the type declarations above for each signature and contract.
@@ -834,13 +834,13 @@ declare sub      CCheckBox_SetHoverTime( byval hCheckBox as HWND, byval millisec
 '   MessageCallback      - observe mouse, focus and key messages; TRUE suppresses the control's
 '                          default handling (IGNORED for WM_LBUTTONUP and the two focus messages).
 '   TooltipCallback      - supply tooltip text on demand when the control has none of its own.
-'   CheckChangedCallback - the USER flipped the box (or the host called CCheckBox_Toggle).
+'   CheckChangedCallback - the USER flipped the box (or the host called PsCheckBox_Toggle).
 '                          Programmatic SetChecked is silent.
 ' ----------------------------------------------------------------------------------------
-declare sub      CCheckBox_SetPaintCallback( byval hCheckBox as HWND, byval usersub as CHK_PaintCallbackSub )
-declare sub      CCheckBox_SetMessageCallback( byval hCheckBox as HWND, byval userfunc as CHK_MessageCallbackFunc )
-declare sub      CCheckBox_SetTooltipCallback( byval hCheckBox as HWND, byval userfunc as CHK_TooltipCallbackFunc )
-declare sub      CCheckBox_SetCheckChangedCallback( byval hCheckBox as HWND, byval usersub as CHK_CheckChangedCallbackSub )
+declare sub      PsCheckBox_SetPaintCallback( byval hCheckBox as HWND, byval usersub as CHK_PaintCallbackSub )
+declare sub      PsCheckBox_SetMessageCallback( byval hCheckBox as HWND, byval userfunc as CHK_MessageCallbackFunc )
+declare sub      PsCheckBox_SetTooltipCallback( byval hCheckBox as HWND, byval userfunc as CHK_TooltipCallbackFunc )
+declare sub      PsCheckBox_SetCheckChangedCallback( byval hCheckBox as HWND, byval usersub as CHK_CheckChangedCallbackSub )
 
 ' ----------------------------------------------------------------------------------------
 ' Plumbing.  Two offscreen probes and the self-test. Nothing in the control calls the probes;
@@ -850,10 +850,10 @@ declare sub      CCheckBox_SetCheckChangedCallback( byval hCheckBox as HWND, byv
 '   CountRenderedTones - render the control OFFSCREEN with its current painter and return how
 '                 many distinct colours land inside one of its rects (capped at 64).
 '
-'                 THE DEFECT: CBufferPaint.PaintBorderRect FILLS before it strokes, so a paint
+'                 THE DEFECT: PsBufferPaint.PaintBorderRect FILLS before it strokes, so a paint
 '                 callback that reaches for it to draw a frame or a focus ring floods everything
 '                 beneath and the control renders as one solid block. That has shipped three
-'                 times in this family (CToggle, CComboBox, CNumericUpDown), every time from a
+'                 times in this family (PsToggle, PsComboBox, PsNumericUpDown), every time from a
 '                 copied callback, and it survives a glance because the flood colour is a real
 '                 colour from the control. A wiped part is literally ONE tone.
 '
@@ -866,7 +866,7 @@ declare sub      CCheckBox_SetCheckChangedCallback( byval hCheckBox as HWND, byv
 '                 THE DEFECT IT CATCHES: a state change that never reaches the surface. Every
 '                 numeric assertion about a checkbox can pass while the box draws the same glyph
 '                 in both states -- the stored flag flips, the layout is right, the colours
-'                 resolve correctly, and the pixels never move. CNumericUpDown shipped exactly
+'                 resolve correctly, and the pixels never move. PsNumericUpDown shipped exactly
 '                 this class of bug (a SendMessage whose failure was never checked), so here the
 '                 claim "checking the box changes what is drawn" is asserted against the pixels:
 '                 hash(rcBox, unchecked) <> hash(rcBox, checked).
@@ -892,9 +892,9 @@ declare sub      CCheckBox_SetCheckChangedCallback( byval hCheckBox as HWND, byv
 '   control has no geometry yet.
 '
 '   RunSelfTest - geometry, colour-resolution, notify-contract, window-text, Tab-reachability and
-'                 render assertions, gated on the CCHECKBOX_SELFTEST env var. Call it from the
+'                 render assertions, gated on the PSCHECKBOX_SELFTEST env var. Call it from the
 '                 host before the message loop.
 ' ----------------------------------------------------------------------------------------
-declare function CCheckBox_CountRenderedTones( byval hCheckBox as HWND, byval nPart as long ) as long
-declare function CCheckBox_HashRenderedPart( byval hCheckBox as HWND, byval nPart as long ) as ulong
-declare sub      CCheckBox_RunSelfTest( byval hWndParent as HWND )
+declare function PsCheckBox_CountRenderedTones( byval hCheckBox as HWND, byval nPart as long ) as long
+declare function PsCheckBox_HashRenderedPart( byval hCheckBox as HWND, byval nPart as long ) as ulong
+declare sub      PsCheckBox_RunSelfTest( byval hWndParent as HWND )
