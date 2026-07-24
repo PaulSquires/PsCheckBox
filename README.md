@@ -1,18 +1,21 @@
 # CCheckBox
 
 An owner-drawn checkbox for FreeBASIC + Win32, built on AfxNova and `CBufferPaint`. It draws a
-box glyph from a font — Segoe Fluent Icons by default — and an optional caption, with a focus
-ring around the pair. The box can sit on either side of the caption. You supply the colours and
-the fonts; the control owns the geometry and the state.
+box glyph from a font — Segoe Fluent Icons by default — and an optional caption, with a focus ring
+around the pair. The box can sit on either side of the caption. You supply the colours and the
+fonts; the control owns the geometry and the state.
 
-It is a real `HWND`, so you place and size it with `SetWindowPos` like any other control. It
-takes focus, tracks hover and press, greys itself when disabled, and tells you when the user
-changed its state. It has two states — checked and unchecked. There is no indeterminate state.
+It is a real `HWND`, so you place and size it with `SetWindowPos` like any other control. It takes
+focus, tracks hover and press, greys itself when disabled through `EnableWindow`, and tells you
+when the user changed its state. It has two states — checked and unchecked. There is no
+indeterminate state.
 
-The box is **one composite glyph per state**: `U+E739` (an empty square) for unchecked and
-`U+E73A` (the square with a tick) for checked, both of which you can replace. That means the
-outline and the tick are a single piece of ink in a single colour. If you want an accent-filled
-box with a contrasting white tick, that needs a paint callback.
+The box is **one composite glyph per state**: `U+E739`, an empty outlined square, for unchecked,
+and `U+E73A`, the same square with a tick in it, for checked. Both are settable. That single
+decision shapes the rest of the control: the outline and the tick are one piece of ink in one
+colour, so an accent-filled box with a contrasting white tick is not reachable without a paint
+callback — but everything about the box's appearance is swappable by changing a font or a
+codepoint.
 
 ## What it looks like
 
@@ -30,12 +33,12 @@ Copy these files into your project:
 | `CBufferPaint.inc` | |
 
 You also need AfxNova on the include path (`-i "C:\dev"` if your tree matches this one), and a
-font for the box glyph — `SegoeFluentIcons.ttf` ships with this repo.
+font supplying the box glyph — `SegoeFluentIcons.ttf` ships with this repo.
 
 ### Include order
 
-`CCheckBox.inc` includes `CCheckBox.bi`, which includes `CBufferPaint.bi`. But the
-**implementation** of `CBufferPaint` is not pulled in for you, so include it yourself, first:
+`CCheckBox.inc` includes `CCheckBox.bi`, which includes `CBufferPaint.bi`. The **implementation**
+of `CBufferPaint` is not pulled in for you, so include it yourself, first:
 
 ```freebasic
 #include once "windows.bi"
@@ -47,6 +50,9 @@ using AfxNova
 #include once "CBufferPaint.inc"
 #include once "CCheckBox.inc"
 ```
+
+Beyond that there is no ordering trap: `CCheckBox.bi` names no type it does not itself include,
+so it compiles at any site that has already loaded `CBufferPaint`.
 
 ### GDI+ must be running
 
@@ -71,9 +77,9 @@ definition the moment you adopt this control. Use `bOK`.
 
 **There is no `CCheckBox_FilterMessage`.** This control owns no popup and no second top-level
 window, so it adds no pump obligation — unlike `CComboBox`, `CNumericUpDown` and `CTextBox`, which
-all do. If you came from one of those, there is nothing to look for here.
+all do. If you arrived from one of those, there is nothing to look for here.
 
-Two things your pump *does* need, because the control is focusable:
+Two things your pump *does* need, because the control is focusable. First, `IsDialogMessage`:
 
 ```freebasic
 do while GetMessage(@uMsg, null, 0, 0)
@@ -86,19 +92,19 @@ do while GetMessage(@uMsg, null, 0, 0)
 loop
 ```
 
-and, once at startup, focus on one of your controls:
+Second, once at startup, focus on one of your controls:
 
 ```freebasic
 SetFocus( hCheck )
 ```
 
-`IsDialogMessage` only acts when the focused window is already a descendant of the window you
-pass it. Without that `SetFocus`, Tab does nothing until the user clicks something, which reads
-as broken tabstops. A dialog does this for you in `WM_INITDIALOG`; an ordinary `CWindow` host must
-do it itself.
+`IsDialogMessage` only acts when the focused window is already a descendant of the window you pass
+it. Without that `SetFocus`, Tab does nothing until the user clicks something — a symptom that
+reads as broken tabstops. A dialog does this for you in `WM_INITDIALOG`; an ordinary `CWindow`
+host must do it itself.
 
 Without `IsDialogMessage` the control still works fully with the mouse, and with Space and Enter
-once it has focus — only Tab *navigation* is lost.
+once it has focus. Only Tab *navigation* is lost.
 
 ## Quick start
 
@@ -125,7 +131,7 @@ sub OnDarkModeChanged( byval hCheckBox as HWND, byval isChecked as boolean )
 end sub
 ```
 
-That callback fires for a completed click, for Space/Enter, and for `CCheckBox_Toggle`. It does
+That callback fires for a completed click, for Space or Enter, and for `CCheckBox_Toggle`. It does
 **not** fire for `CCheckBox_SetChecked`.
 
 ## Concepts
@@ -134,7 +140,7 @@ That callback fires for a completed click, for Space/Enter, and for `CCheckBox_T
 
 `CCheckBox_Create` returns an `HWND`, not an opaque type, because you legitimately need to treat
 the control as a window — `SetWindowPos`, `ShowWindow`, `EnableWindow`, `GetDlgItem`. The `CtrlID`
-you pass becomes the window's `GWLP_ID`.
+you pass becomes the window's `GWLP_ID` and the initial `SetID` value.
 
 The control frees itself when its window is destroyed, and destroys its tooltip with it. The two
 fonts you hand it stay yours to delete.
@@ -167,7 +173,8 @@ BOXALIGN_RIGHT   rcBox  at rcContent.right - nPadRight - nBoxWidth, same, v-cent
 
 `CCheckBox_GetIdealSize` is valid **before** the control has ever been sized — the measuring pass
 runs ahead of the check for a client area, precisely so you can call it to decide how big to make
-the control in the first place.
+the control in the first place. It is also unaffected by starving the control's client area, so a
+host that always sizes with it can never see an ellipsis.
 
 ### The box is pinned; the caption gets the leftover
 
@@ -180,17 +187,19 @@ sized to a row width      Enable dark mode            [x]   settings row
 ```
 
 So a column of `CHK_BOXALIGN_RIGHT` checkboxes all given the same width will line their boxes up
-for free. Flipping the side does **not** change the ideal size — the mirror is exact.
+for free. Flipping the side does **not** change the ideal size — the box cell, the gap and both
+paddings are all still charged, they have only swapped ends.
 
 `CCheckBox_SetTextAlign` places the caption inside that **span**, not inside the control. With the
 box on the left and `CHK_TEXTALIGN_RIGHT`, the caption goes to the right-hand end of the span, not
-to the right-hand edge of the window.
+to the right-hand edge of the window. Sized to its ideal width the span *is* the caption, so all
+three alignments render identically — alignment only becomes visible once the control has slack.
 
 ### The box cell is declared, not measured
 
 `CCheckBox_SetBoxSize` states how much room the glyph gets. The control never measures the glyph
-font, so a glyph too large for the cell clips rather than resizing the control. This is why
-`CCheckBox_SetGlyphFont` repaints but never re-lays-out, and why swapping the glyph strings can
+font, so a glyph too large for its cell clips rather than resizing the control. This is why
+`CCheckBox_SetGlyphFont` repaints but never re-lays-out, and why swapping either glyph string can
 never change the ideal width.
 
 ### Setters are silent; user interaction notifies
@@ -214,31 +223,39 @@ callback and return TRUE for `VK_RETURN`.
 The focus ring's band is reserved whether or not the control has focus, so nothing moves when
 focus arrives — which also means the ring settings contribute to the ideal size.
 
+### Mouse capture and the cancelled gesture
+
+The control takes mouse capture on a press, because press → slide off → release must **not**
+toggle. Only a matched press and release with the cursor still inside counts as a click. While the
+press is live the hover state keeps tracking, so sliding off visibly un-flashes the control before
+the release decides that nothing happened.
+
 ## Behaviour and limits
 
 - **Two states only.** `isChecked` is a `boolean` everywhere, including in the change callback.
   There is no indeterminate / tri-state.
 - **One colour per box.** The composite glyph is a single piece of ink, so the box outline and the
-  tick inside it always share a colour. Two-colour boxes need a paint callback.
+  tick inside it always share a colour. A two-colour box needs a paint callback.
 - **No mnemonics.** `"&Enable"` draws a literal ampersand. `CBufferPaint.PaintText` forces
-  `DT_NOPREFIX`, so this is enforced by the renderer, not merely intended. Wire an accelerator to
-  `CCheckBox_Toggle` instead.
+  `DT_NOPREFIX`, so this is enforced by the renderer rather than merely intended. Wire an
+  accelerator to `CCheckBox_Toggle` instead.
 - **No multiline.** One line, ellipsized into the caption span. Wrapping would make the ideal
   height depend on the assigned width, which would cost `GetIdealSize` its "valid before sizing"
   guarantee.
 - **No `HICON` path.** The box comes from a font, or from your paint callback.
 - **No `WM_COMMAND` / `BN_CLICKED` to the parent.** State changes reach you through the callback
   only.
-- **No `CS_DBLCLKS`.** A rapid second click is a legitimate second toggle, and enabling
-  double-clicks would turn it into a `WM_LBUTTONDBLCLK` the control would drop.
+- **No `CS_DBLCLKS`.** A rapid second click is a legitimate second toggle; enabling double-clicks
+  would turn it into a `WM_LBUTTONDBLCLK` the control would drop.
 - **No hit test.** The whole client is the hit area — clicking the caption toggles, exactly as a
   system checkbox does — so a hit test could only ever be `PtInRect(client)`.
 - **Overflow is honest, not squeezed.** Too narrow, and the box keeps its declared size and its
   padding while the caption span collapses to zero width and the caption ellipsizes. Too short,
   and the content clips rather than deforming.
-- **A caption-less checkbox is shorter.** With no caption the content height falls back to the box
-  alone, so it has a smaller ideal height than its captioned neighbours. If you are laying out a
-  column, take the max yourself.
+- **Removing the caption drops the content height to the box alone.** A caption-less checkbox is
+  therefore never taller than a captioned one, and is shorter whenever the box is smaller than a
+  line of text — which it is at the defaults. If you are laying out a column of mixed rows, take
+  the max of the ideal heights yourself.
 - **`SetGlyphFont` is worth setting.** Unset, the glyph falls back to the caption font, which will
   draw the Fluent codepoint as a missing-glyph box.
 
@@ -257,9 +274,9 @@ All silent — they change what is drawn, never what was clicked.
 | Function | Behaviour |
 |---|---|
 | `CCheckBox_GetText( hCheckBox ) as DWSTRING` | The caption. |
-| `CCheckBox_SetText( hCheckBox, Text )` | Sets the caption and re-measures. `""` removes it, which also gives back the box gap and shrinks the ideal height to the box. Also reachable as the window text — see below. |
+| `CCheckBox_SetText( hCheckBox, Text )` | Sets the caption and re-measures. `""` removes it, which also gives back the box gap and drops the content height to the box alone. Also reachable as the window text — see below. |
 | `CCheckBox_GetGlyphUnchecked( hCheckBox ) as DWSTRING` | The codepoint(s) drawn when unchecked. |
-| `CCheckBox_SetGlyphUnchecked( hCheckBox, Glyph )` | Replaces it. Repaints only — the cell is declared, so this can never change the ideal size. `""` draws nothing while still charging the cell and gap. |
+| `CCheckBox_SetGlyphUnchecked( hCheckBox, Glyph )` | Replaces it. Repaints only — the cell is declared, so this can never change the ideal size. `""` draws nothing while still charging the cell and the gap. |
 | `CCheckBox_GetGlyphChecked( hCheckBox ) as DWSTRING` | The codepoint(s) drawn when checked. |
 | `CCheckBox_SetGlyphChecked( hCheckBox, Glyph )` | As above, for the checked state. |
 | `CCheckBox_GetID( hCheckBox ) as long` | The stored host id. |
@@ -268,20 +285,24 @@ All silent — they change what is drawn, never what was clicked.
 | `CCheckBox_SetItemData( hCheckBox, itemData )` | Stores it. The control never reads it. |
 
 The caption has one store reached through two doors: the control handles `WM_SETTEXT`,
-`WM_GETTEXT` and `WM_GETTEXTLENGTH` against the same field, so `SetWindowText` and
-`GetWindowText` work and generic code that walks children and reads their text sees a real
-caption. `SetWindowText` re-measures exactly as `SetText` does.
+`WM_GETTEXT` and `WM_GETTEXTLENGTH` against the same field, so `SetWindowText` and `GetWindowText`
+work and generic code that walks children and reads their text sees a real caption.
+`SetWindowText` re-measures exactly as `SetText` does.
 
 ### State
 
 | Function | Behaviour |
 |---|---|
 | `CCheckBox_GetChecked( hCheckBox ) as boolean` | The current state. |
-| `CCheckBox_SetChecked( hCheckBox, isChecked )` | **Silent** — fires no callback. Repaints only; never re-measures, since both glyphs share one declared cell. |
+| `CCheckBox_SetChecked( hCheckBox, isChecked )` | **Silent** — fires no callback. Repaints only; never re-measures, since both glyphs share one declared cell. Does nothing if the state already matches. |
 | `CCheckBox_GetEnabled( hCheckBox ) as boolean` | |
 | `CCheckBox_SetEnabled( hCheckBox, isEnabled )` | Goes through `EnableWindow`, so the disable is enforced by the system: the control gets no mouse input and Tab skips it. Clears hover and any live press at once. Does **not** change the checked state. |
 | `CCheckBox_GetFocused( hCheckBox ) as boolean` | Answers for this window directly — there is no inner child holding focus. |
 | `CCheckBox_Refresh( hCheckBox )` | Marks the layout stale and invalidates with a background erase. |
+
+Reaching for `EnableWindow` yourself instead of `SetEnabled` also works: the control handles
+`WM_ENABLE` and syncs its own flag, so it still renders greyed rather than looking live while
+eating input.
 
 ### Action
 
@@ -291,13 +312,13 @@ caption. `SetWindowText` re-measures exactly as `SetText` does.
 
 ### Geometry and layout
 
-Every setter takes **raw pixels**; you do the DPI scaling. Only the Create-time defaults are
-scaled for you, and `nFocusThick` is never scaled at all — a hairline should stay a hairline.
+Every setter takes **raw pixels**; you do the DPI scaling. Only the Create-time defaults are scaled
+for you, and `nFocusThick` is never scaled at all — a hairline should stay a hairline.
 
 | Function | Behaviour |
 |---|---|
 | `CCheckBox_GetBoxAlign( hCheckBox ) as long` | `CHK_BOXALIGN_LEFT` or `CHK_BOXALIGN_RIGHT`. |
-| `CCheckBox_SetBoxAlign( hCheckBox, nBoxAlign )` | Puts the box on that side, pinned to that side's padding. Values outside the enum are **ignored**. Does not change the ideal size. |
+| `CCheckBox_SetBoxAlign( hCheckBox, nBoxAlign )` | Puts the box on that side, pinned to that side's padding. Values outside the enum are **ignored**. Does not change the ideal size, so it never triggers auto-size. |
 | `CCheckBox_GetTextAlign( hCheckBox ) as long` | `CHK_TEXTALIGN_*`. |
 | `CCheckBox_SetTextAlign( hCheckBox, nTextAlign )` | Places the caption within its **span**, not within the control. Values outside the enum are **ignored**. Repaints only — the span does not move, just the ink inside it. |
 | `CCheckBox_GetPadding( hCheckBox, nLeft, nTop, nRight, nBottom )` | All four, by reference. |
@@ -307,11 +328,11 @@ scaled for you, and `nFocusThick` is never scaled at all — a hairline should s
 | `CCheckBox_GetBoxSize( hCheckBox, nBoxWidth, nBoxHeight )` | |
 | `CCheckBox_SetBoxSize( hCheckBox, nBoxWidth, nBoxHeight )` | The declared cell for the glyph. Nothing is measured, so this is the only thing deciding how much room the glyph gets. Negative clamps to 0. |
 | `CCheckBox_GetFocusRing( hCheckBox, nGap, nThickness )` | |
-| `CCheckBox_SetFocusRing( hCheckBox, nGap, nThickness )` | Gap from the content to the ring, and the ring's thickness. Both are reserved unconditionally, so **changing either changes the ideal size**. Negative clamps to 0; thickness 0 disables the ring. |
+| `CCheckBox_SetFocusRing( hCheckBox, nGap, nThickness )` | Gap from the content to the ring, and the ring's own thickness. Both are reserved unconditionally, so **changing either changes the ideal size**. Negative clamps to 0; thickness 0 disables the ring. |
 | `CCheckBox_GetFocusCurvature( hCheckBox ) as long` | |
 | `CCheckBox_SetFocusCurvature( hCheckBox, nCurvature )` | An ellipse **diameter**, not a radius: 8 draws a 4px radius. 0 gives square corners. Repaints only — the band's width is the gap plus the thickness, not the curvature. Negative clamps to 0. |
 | `CCheckBox_GetAutoSize( hCheckBox ) as boolean` | |
-| `CCheckBox_SetAutoSize( hCheckBox, bAutoSize )` | When true the control `SetWindowPos`es **itself** to its ideal size (keeping its top-left) whenever the caption, font, padding, gap, box size or focus ring changes. Default false. |
+| `CCheckBox_SetAutoSize( hCheckBox, bAutoSize )` | When true the control `SetWindowPos`es **itself** to its ideal size, keeping its top-left, and applies it immediately. Default false. |
 | `CCheckBox_GetIdealSize( hCheckBox, nWidth, nHeight )` | Forces any pending layout and returns the measured size. **Valid before the control has ever been sized**, and unaffected by starving the control's client area. |
 | `CCheckBox_GetContentRect( hCheckBox, rc ) as boolean` | The client deflated by the focus-ring band. Returns FALSE if the control has no geometry yet. |
 | `CCheckBox_GetBoxRect( hCheckBox, rc ) as boolean` | The box cell. Never empty. |
@@ -320,21 +341,25 @@ scaled for you, and `nFocusThick` is never scaled at all — a hairline should s
 
 All four rect queries force a pending layout first, so results are always current.
 
+With auto-size on, the setters that re-apply it are exactly the ones that can move the ideal size:
+`SetText` (and `WM_SETTEXT`), `SetFont`, `SetPadding`, `SetBoxGap`, `SetBoxSize`, `SetFocusRing`,
+and `SetAutoSize` itself.
+
 ### Appearance
 
 | Function | Behaviour |
 |---|---|
-| `CCheckBox_GetColors( hCheckBox, pColors )` | Fills your struct. The read-modify-write idiom is Get, assign one field, Set. |
-| `CCheckBox_SetColors( hCheckBox, pColors )` | Copies the whole struct and repaints. |
+| `CCheckBox_GetColors( hCheckBox, pColors )` | Fills your struct. The read-modify-write idiom is Get, assign one field, Set. Does nothing if `pColors` is null. |
+| `CCheckBox_SetColors( hCheckBox, pColors )` | Copies the whole struct and repaints. Does nothing if `pColors` is null. |
 | `CCheckBox_GetFont( hCheckBox ) as HFONT` | |
-| `CCheckBox_SetFont( hCheckBox, hTextFont )` | The caption font, and the **measuring** font. Changing it re-measures and can change the ideal size. Borrowed, never owned. |
+| `CCheckBox_SetFont( hCheckBox, hTextFont )` | The caption font, and the **measuring** font. Changing it re-measures and can change the ideal size. Borrowed, never owned. Unset, the control measures and paints with the stock GUI font. |
 | `CCheckBox_GetGlyphFont( hCheckBox ) as HFONT` | |
-| `CCheckBox_SetGlyphFont( hCheckBox, hGlyphFont ) ` | The box font. A paint-time input only: repaints, never re-lays-out, never resizes. Unset, it falls back to the caption font. Borrowed, never owned. |
+| `CCheckBox_SetGlyphFont( hCheckBox, hGlyphFont )` | The box font. A paint-time input only: repaints, never re-lays-out, never resizes. Unset, it falls back to the caption font. Borrowed, never owned. |
 
 ### Colour resolution
 
-Both are pure functions — no control handle, no globals — so you can call them from your own
-paint callback to get exactly the colours the built-in painter would have used.
+Both are pure functions — no control handle, no globals — so you can call them from your own paint
+callback to get exactly the colours the built-in painter would have used.
 
 | Function | Behaviour |
 |---|---|
@@ -346,7 +371,7 @@ paint callback to get exactly the colours the built-in painter would have used.
 | Function | Behaviour |
 |---|---|
 | `CCheckBox_GetTooltipText( hCheckBox ) as DWSTRING` | |
-| `CCheckBox_SetTooltipText( hCheckBox, Text )` | The control's own tip text. When set it wins over the callback. |
+| `CCheckBox_SetTooltipText( hCheckBox, Text )` | The control's own tip text. When non-empty it wins over the callback. Stores only — the tip is pulled on demand, so there is nothing to repaint. |
 | `CCheckBox_GetTooltipHandle( hCheckBox ) as HWND` | The tooltip window, created for you at `Create` and destroyed with the control. |
 | `CCheckBox_SetHoverTime( hCheckBox, milliseconds )` | Sets `TTDT_INITIAL` on the tooltip. |
 
@@ -358,7 +383,7 @@ just repeats it.
 
 | Function | Behaviour |
 |---|---|
-| `CCheckBox_SetPaintCallback( hCheckBox, usersub )` | Replaces the built-in painter wholesale. |
+| `CCheckBox_SetPaintCallback( hCheckBox, usersub )` | Replaces the built-in painter wholesale, and repaints. |
 | `CCheckBox_SetMessageCallback( hCheckBox, userfunc )` | Observe mouse, focus and key messages. |
 | `CCheckBox_SetTooltipCallback( hCheckBox, userfunc )` | Supply tip text on demand. |
 | `CCheckBox_SetCheckChangedCallback( hCheckBox, usersub )` | User-driven state changes. |
@@ -367,19 +392,21 @@ Pass `0` to any of them to remove the callback.
 
 ### Render probes
 
-Neither is called by the control. They exist so that a host writing its own paint callback can
-**assert** two specific defects rather than eyeball them, and both render the control offscreen
-with its current painter, with focus forced on.
+Neither is called by the control. They exist so a host writing its own paint callback can
+**assert** two specific defects rather than eyeball them. Both render the control offscreen with
+its current painter and with focus forced on, so the focus-ring step — the one the flood defect
+lives on — is actually exercised.
 
 | Function | Behaviour |
 |---|---|
-| `CCheckBox_CountRenderedTones( hCheckBox, nPart ) as long` | How many distinct colours land inside one `CHK_PART_*` rect, capped at 64. Returns 0 if the control has no geometry. A part wiped by an unintended fill is literally **one** tone, so the useful assertion is `> 1`. |
+| `CCheckBox_CountRenderedTones( hCheckBox, nPart ) as long` | How many distinct colours land inside one `CHK_PART_*` rect, capped at 64. Returns 0 if the control has no geometry or the part rect is empty. A part wiped by an unintended fill is literally **one** tone, so the useful assertion is `> 1`. |
 | `CCheckBox_HashRenderedPart( hCheckBox, nPart ) as ulong` | An FNV-1a hash of the pixels in one `CHK_PART_*` rect. Compare two states to prove a change actually reached the surface. Returns 0 on failure. |
 
 `HashRenderedPart` can only ever prove **difference**, never correctness — and only for what you
 isolate. Comparing checked against unchecked proves "the state reached the pixels", but not that
 the *glyph* did, because the box colour changes too. To isolate one variable, flatten the other
-first.
+first: set all eight box colours to the same value and the only thing left that can move a pixel
+is the glyph.
 
 ## Colors
 
@@ -407,12 +434,13 @@ takes a copy, `Get` fills one out.
 | `FocusRingColor` | The focus ring | Whenever the control has focus |
 
 **Precedence:** `disabled > pressed > hot > idle`. The checked flag is not a mood — it selects
-between the two box colour sets *inside* whichever mood resolved, and touches nothing else.
+between the two box colour sets *inside* whichever mood resolved, and touches nothing else. That
+is also why a disabled ticked box still reads as ticked: it has its own colour.
 
 **The control reads completely flat out of the box.** `BackColorHot`, `BackColorPressed` and
 `BackColorDisabled` all default **equal to** `BackColor`, so hovering changes only the box and the
-caption. That is usually what you want in a settings pane. To get a menu-style highlight across
-the whole row, set one field:
+caption. That is usually what you want in a settings pane. To get a menu-style highlight across the
+whole row, set one field:
 
 ```freebasic
 dim as CCHECKBOX_COLORS c
@@ -436,8 +464,8 @@ with the `isChecked` you are handed.
 `CCheckBox_SetChecked` does **not** fire it, which is what makes it safe to call `SetChecked` from
 inside this handler.
 
-Nothing fires for a cancelled gesture: press the control, slide off it, release, and the state
-does not change.
+Nothing fires for a cancelled gesture: press the control, slide off it, release, and the state does
+not change.
 
 ### CHK_PaintCallbackSub
 
@@ -449,7 +477,8 @@ Draws the whole control **instead of** the built-in painter. Paint through `p->b
 double buffer for this repaint. Do not touch the screen DC.
 
 The control has already filled the client with the resolved mood's `BackColor` before calling you,
-so a callback that only adds a foreground does not have to repaint the background.
+so a callback that only adds a foreground does not have to repaint the background. The focus ring
+is the built-in painter's job too, so a callback that wants one must draw it.
 
 Two rules worth honouring:
 
@@ -457,8 +486,8 @@ Two rules worth honouring:
   measured with it; a wider font here makes that measurement a lie and the caption clips.
 - **Do not use `PaintBorderRect` to draw a frame or a ring.** It fills before it strokes, so used
   as an outline it erases everything beneath it and the control renders as one solid block. Use
-  `PaintRoundOutline`, which strokes without filling. `CCheckBox_CountRenderedTones` exists so you
-  can assert you have not done this.
+  `PaintRoundOutline`, which strokes without filling, or `PaintRectFactory` when you do want the
+  fill. `CCheckBox_CountRenderedTones` exists so you can assert you have not made this mistake.
 
 More generally: a callback that fills a rectangle covering the whole control erases everything
 already drawn. Draw your additions, not a background.
@@ -472,9 +501,11 @@ type CHK_MessageCallbackFunc as function( byval m as CCHECKBOX_MESSAGEINFO ptr )
 Observe messages. Return TRUE to suppress the control's default handling, FALSE to let it proceed.
 
 You see the mouse messages (`WM_MOUSEMOVE`, `WM_MOUSELEAVE`, `WM_LBUTTONDOWN`, `WM_LBUTTONUP`,
-`WM_RBUTTONDOWN`, `WM_RBUTTONUP`), the focus messages, and `WM_KEYDOWN`.
+`WM_RBUTTONDOWN`, `WM_RBUTTONUP`), both focus messages, and `WM_KEYDOWN`. The right-button messages
+are reported and never acted on — a context menu is your business — and because no capture is taken
+for the right button, an up can arrive without a down.
 
-**The result is ignored for three of them:**
+**The result is ignored for three messages:**
 
 | Message | Why |
 |---|---|
@@ -508,13 +539,17 @@ Return `""` for no tooltip.
 | `isEnabled` | |
 | `isFocused` | Draw a focus ring when true |
 | `wszText` | The caption |
-| `wszGlyph` | The glyph **already resolved** for `isChecked`, so you do not repeat the choice |
+| `wszGlyph` | The glyph **already resolved** for `isChecked`, so you do not repeat the choice and cannot disagree with the control about which glyph belongs to which state |
 | `nBoxAlign` | `CHK_BOXALIGN_*` |
 | `nTextAlign` | `CHK_TEXTALIGN_*` — map to `DT_LEFT` / `DT_CENTER` / `DT_RIGHT` |
 
 `rcText` is the span, not a tight box around the glyphs. That is what `DT_END_ELLIPSIS` needs;
 handed a tight box the ellipsis would have nowhere to happen. It also means filling `rcText` fills
 the whole span, not just behind the words.
+
+Test presence on the **rects**, not on the strings: an absent caption leaves `rcText` empty, so
+`IsRectEmpty` is the single source of truth — and a degenerate span on a too-narrow control drops
+out of the same test.
 
 ### CCHECKBOX_MESSAGEINFO
 
@@ -544,12 +579,12 @@ the whole span, not just behind the words.
 
 ### Moods
 
-| Value | |
+| Value | Meaning |
 |---|---|
-| `CHK_MOOD_IDLE` | |
-| `CHK_MOOD_HOT` | |
-| `CHK_MOOD_PRESSED` | |
-| `CHK_MOOD_DISABLED` | |
+| `CHK_MOOD_IDLE` | Nothing is happening |
+| `CHK_MOOD_HOT` | The cursor is over the control |
+| `CHK_MOOD_PRESSED` | A live left press, cursor still inside |
+| `CHK_MOOD_DISABLED` | Beats all three |
 
 ### Probe parts
 
@@ -565,6 +600,10 @@ the whole span, not just behind the words.
 |---|---|---|
 | `CCHECKBOX_GLYPH_UNCHECKED` | `U+E739` | Checkbox — an empty outlined square |
 | `CCHECKBOX_GLYPH_CHECKED` | `U+E73A` | CheckboxComposite — the square with a tick |
+
+Both are written in the header as `\u` escapes rather than as literal characters, because a
+BOM-less source file is read as bytes and a pasted `U+E739` would arrive as its three UTF-8 bytes.
+Do the same if you replace them from source.
 
 ### Default geometry
 
@@ -585,8 +624,9 @@ All are DPI-scaled once at `Create` except `CCHECKBOX_DEFAULT_FOCUSTHICK`, which
 
 ### Hover tracking
 
-`WM_MOUSELEAVE` is not reliably delivered on fast exits, so the control also polls the cursor
-while it is hot.
+`WM_MOUSELEAVE` is not reliably delivered on fast exits, so the control also polls the cursor while
+it is hot. The poll is suppressed while a press is live, because the press legitimately lets the
+cursor wander off and come back.
 
 | Constant | Value | |
 |---|---|---|
