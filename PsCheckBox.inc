@@ -1,19 +1,19 @@
 ''
-''  CCheckBox.inc  --  owner-drawn checkbox (Fluent box glyph + caption)
+''  PsCheckBox.inc  --  owner-drawn checkbox (Fluent box glyph + caption)
 ''
 
-#include once "CCheckBox.bi"
+#include once "PsCheckBox.bi"
 
 
 ' Forward declaration: the content setters re-apply auto-size, and they are defined well above
 ' the layout section where it lives.
-declare sub CCheckBox_ApplyAutoSize( byval pChk as CCHECKBOX ptr )
+declare sub PsCheckBox_ApplyAutoSize( byval pChk as PSCHECKBOX ptr )
 
 
-function GetCheckBoxPointer( byval hCheckBox as HWND ) as CCHECKBOX ptr
+function GetCheckBoxPointer( byval hCheckBox as HWND ) as PSCHECKBOX ptr
     dim pWindow as CWindow ptr = AfxCWindowPtr(hCheckBox)
     if pWindow = 0 then return 0
-    return cast( CCHECKBOX ptr, pWindow->UserData(0) )
+    return cast( PSCHECKBOX ptr, pWindow->UserData(0) )
 end function
 
 
@@ -22,11 +22,11 @@ end function
 '
 ' Callers decide whether to honor that answer -- three messages deliberately do not.
 ' WM_LBUTTONUP is one of them here, because this control HOLDS MOUSE CAPTURE across a press and
-' the up-message is what releases it. (CComboBox, which takes no capture, honours its callback's
+' the up-message is what releases it. (PsComboBox, which takes no capture, honours its callback's
 ' answer for that message; a note copied in from there would be a lie here.)
 ' ========================================================================================
-private function CCheckBox_CallMessage( _
-            byval pChk   as CCHECKBOX ptr, _
+private function PsCheckBox_CallMessage( _
+            byval pChk   as PSCHECKBOX ptr, _
             byval hwnd   as HWND, _
             byval uMsg   as UINT, _
             byval wParam as WPARAM, _
@@ -36,7 +36,7 @@ private function CCheckBox_CallMessage( _
     if pChk = 0 then return false
     if pChk->MessageCallback = 0 then return false
 
-    dim as CCHECKBOX_MESSAGEINFO m
+    dim as PSCHECKBOX_MESSAGEINFO m
     m.hCheckBox = hwnd
     m.uMsg      = uMsg
     m.wParam    = wParam
@@ -48,7 +48,7 @@ end function
 ' Resolve the tooltip text: the control's own text if it has any, else the host callback.
 ' NO CAPTION FALLBACK -- a checkbox's caption is already on screen, so falling back to it would
 ' pop a tip that repeats what the user is looking at.
-private function CCheckBox_ResolveTooltipText( byval pChk as CCHECKBOX ptr ) as DWSTRING
+private function PsCheckBox_ResolveTooltipText( byval pChk as PSCHECKBOX ptr ) as DWSTRING
     if pChk = 0 then return ""
     if len( pChk->wszTooltip ) then
         dim as DWSTRING wszOut = pChk->wszTooltip
@@ -62,15 +62,15 @@ end function
 ' ========================================================================================
 ' Draw the checkbox: box glyph, caption, focus ring.
 '
-' The BACKGROUND is not drawn here -- CCheckBox_OnPaint has already flooded the client with the
+' The BACKGROUND is not drawn here -- PsCheckBox_OnPaint has already flooded the client with the
 ' resolved mood's BackColor, which is what lets a host paint callback that only wants to add a
 ' foreground still sit on the right colour. There is no chrome: this control draws no frame, no
-' border and no rounded body, which is the whole difference from CButton.
+' border and no rounded body, which is the whole difference from PsButton.
 '
-' Nothing in here touches a GDI object or a device context -- CBufferPaint owns rendering and
+' Nothing in here touches a GDI object or a device context -- PsBufferPaint owns rendering and
 ' this control owns geometry and state, which is the family contract.
 '
-' THE COLOURS COME OUT OF CCheckBox_ResolveMood + CCheckBox_ResolveColors, not out of an if-chain
+' THE COLOURS COME OUT OF PsCheckBox_ResolveMood + PsCheckBox_ResolveColors, not out of an if-chain
 ' written inline here. That is what lets the self-test assert the precedence and the
 ' checked/unchecked box split directly, instead of only being able to look at pixels.
 '
@@ -79,10 +79,10 @@ end function
 ' span (the client too narrow to leave any room) drops out of the same test rather than needing
 ' its own.
 ' ========================================================================================
-private sub CCheckBox_RenderDefault( _
-            byval pChk as CCHECKBOX ptr, _
-            byval b    as CBufferPaint ptr, _
-            byval p    as CCHECKBOX_PAINTINFO ptr _
+private sub PsCheckBox_RenderDefault( _
+            byval pChk as PSCHECKBOX ptr, _
+            byval b    as PsBufferPaint ptr, _
+            byval p    as PSCHECKBOX_PAINTINFO ptr _
             )
 
     if (pChk = 0) orelse (b = 0) orelse (p = 0) then exit sub
@@ -92,13 +92,13 @@ private sub CCheckBox_RenderDefault( _
     if (cw <= 0) orelse (ch <= 0) then exit sub
 
     ' ---- which three colors ------------------------------------------------------------
-    dim as long nMood = CCheckBox_ResolveMood( p->isEnabled, p->isPressed, p->isHot )
+    dim as long nMood = PsCheckBox_ResolveMood( p->isEnabled, p->isPressed, p->isHot )
     dim as COLORREF clrBack, clrFore, clrBox
-    CCheckBox_ResolveColors( @pChk->colors, nMood, p->isChecked, clrBack, clrFore, clrBox )
+    PsCheckBox_ResolveColors( @pChk->colors, nMood, p->isChecked, clrBack, clrFore, clrBox )
 
     ' ---- the fonts ---------------------------------------------------------------------
     ' Paint the caption with the SAME font the measuring pass used -- the caller's if set, else
-    ' the stock GUI font. CBufferPaint.SetFont IGNORES a null handle, so leaving it unset would
+    ' the stock GUI font. PsBufferPaint.SetFont IGNORES a null handle, so leaving it unset would
     ' silently paint in the DC's font while the width was measured in another, and long captions
     ' would clip for no visible reason.
     dim as HFONT hTextUse = pChk->hTextFont
@@ -112,7 +112,7 @@ private sub CCheckBox_RenderDefault( _
     ' ---- the box ------------------------------------------------------------------------
     ' The cell is a LAYOUT rect, not a measurement of the glyph: the control never measures the
     ' box font, so a glyph too large for the cell clips rather than resizing the control.
-    ' p->wszGlyph is ALREADY resolved for isChecked (CCHECKBOX.ResolveGlyph), so the state test
+    ' p->wszGlyph is ALREADY resolved for isChecked (PSCHECKBOX.ResolveGlyph), so the state test
     ' lives in exactly one place and this painter cannot disagree with a host's.
     dim as RECT rcB = p->rcBox
     b->SetFont( hGlyphUse )
@@ -142,11 +142,11 @@ private sub CCheckBox_RenderDefault( _
 
     ' ---- the focus ring ----------------------------------------------------------------
     ' Outline, never filled: it is drawn OVER the control, and a filled round rect here would
-    ' erase everything above it (see CCheckBox_CountRenderedTones). Its band is reserved in the
+    ' erase everything above it (see PsCheckBox_CountRenderedTones). Its band is reserved in the
     ' layout whether or not we are focused, which is what stops the content jumping when focus
     ' arrives.
     '
-    ' The curvature is its own setting rather than derived from a body curvature the way CButton
+    ' The curvature is its own setting rather than derived from a body curvature the way PsButton
     ' derives its ring: there is no body here to stay concentric with.
     if p->isFocused then
         if pChk->nFocusThick > 0 then
@@ -162,11 +162,11 @@ end sub
 ' Fill a PAINTINFO from the control's current state and geometry. One place, so the WM_PAINT
 ' path and the two offscreen probes cannot describe the control differently.
 ' ========================================================================================
-private sub CCheckBox_FillPaintInfo( _
-            byval pChk as CCHECKBOX ptr, _
+private sub PsCheckBox_FillPaintInfo( _
+            byval pChk as PSCHECKBOX ptr, _
             byval hwnd as HWND, _
-            byval b    as CBufferPaint ptr, _
-            byval p    as CCHECKBOX_PAINTINFO ptr _
+            byval b    as PsBufferPaint ptr, _
+            byval p    as PSCHECKBOX_PAINTINFO ptr _
             )
 
     if (pChk = 0) orelse (p = 0) then exit sub
@@ -193,32 +193,32 @@ end sub
 ' ========================================================================================
 ' Process WM_PAINT.
 ' ========================================================================================
-private function CCheckBox_OnPaint( byval hwnd as HWND ) as LRESULT
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hwnd)
+private function PsCheckBox_OnPaint( byval hwnd as HWND ) as LRESULT
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hwnd)
     if pChk = null then return 0
 
     ' Consume any pending layout before painting -- this is what makes layout lazy.
     if pChk->bLayoutDirty then pChk->LayoutCheckBox()
 
-    dim as CBufferPaint b
+    dim as PsBufferPaint b
     b.BeginDoubleBuffer(hwnd)
 
     ' The client is filled with the resolved mood's own background, not a fixed one, so a paint
     ' callback that draws only a foreground still sits on the right colour. Resolved through the
     ' same two functions the painter uses, so the fill can never disagree with the rest.
-    dim as long nMood = CCheckBox_ResolveMood( pChk->isEnabled, pChk->isPressed, pChk->isHot )
+    dim as long nMood = PsCheckBox_ResolveMood( pChk->isEnabled, pChk->isPressed, pChk->isHot )
     dim as COLORREF clrFill, clrFore, clrBox
-    CCheckBox_ResolveColors( @pChk->colors, nMood, pChk->isChecked, clrFill, clrFore, clrBox )
+    PsCheckBox_ResolveColors( @pChk->colors, nMood, pChk->isChecked, clrFill, clrFore, clrBox )
     b.SetBackColor( clrFill )
     b.PaintClientRect()
 
-    dim p as CCHECKBOX_PAINTINFO
-    CCheckBox_FillPaintInfo( pChk, hwnd, @b, @p )
+    dim p as PSCHECKBOX_PAINTINFO
+    PsCheckBox_FillPaintInfo( pChk, hwnd, @b, @p )
 
     if pChk->PaintCallback then
         pChk->PaintCallback( @p )
     else
-        CCheckBox_RenderDefault( pChk, @b, @p )
+        PsCheckBox_RenderDefault( pChk, @b, @p )
     end if
 
     b.EndDoubleBuffer()
@@ -230,7 +230,7 @@ end function
 ' Clear the hover state and stop the hover poll timer. Repaints only if the state actually
 ' changes, so this is cheap to call repeatedly.
 ' ========================================================================================
-private sub CCheckBox_ClearHot( byval pChk as CCHECKBOX ptr, byval hwnd as HWND )
+private sub PsCheckBox_ClearHot( byval pChk as PSCHECKBOX ptr, byval hwnd as HWND )
     if pChk = 0 then exit sub
     if pChk->hotTimerOn then
         KillTimer( hwnd, IDT_CCHECKBOX_HOTTRACK )
@@ -245,7 +245,7 @@ end sub
 
 ' ========================================================================================
 ' Apply the ideal size to ourselves, preserving the top-left. Only runs when the host has opted
-' in with CCheckBox_SetAutoSize -- the family default is that a control never moves itself and
+' in with PsCheckBox_SetAutoSize -- the family default is that a control never moves itself and
 ' the host measures with GetIdealSize.
 '
 ' Called from every mutator that can change the ideal size. It forces the pending layout first
@@ -256,7 +256,7 @@ end sub
 ' setters. None of them can move the ideal size -- the two glyphs share one DECLARED cell, and
 ' flipping the alignment mirrors the layout without changing what it costs.
 ' ========================================================================================
-sub CCheckBox_ApplyAutoSize( byval pChk as CCHECKBOX ptr )
+sub PsCheckBox_ApplyAutoSize( byval pChk as PSCHECKBOX ptr )
     if pChk = 0 then exit sub
     if pChk->bAutoSize = false then exit sub
     if pChk->hWin = 0 then exit sub
@@ -271,7 +271,7 @@ end sub
 
 ' ========================================================================================
 ' The one activation path. A completed mouse click, Space/Enter, and the programmatic
-' CCheckBox_Toggle all come through here, so keyboard, mouse and host can never drift apart --
+' PsCheckBox_Toggle all come through here, so keyboard, mouse and host can never drift apart --
 ' and so there is exactly one place that both flips the state and notifies.
 '
 ' It reads isEnabled again rather than trusting the caller: a message callback may have disabled
@@ -280,7 +280,7 @@ end sub
 ' NO RE-LAYOUT. The two glyphs share one declared cell, so flipping the state cannot move a
 ' single rect -- an InvalidateRect without the erase flag is the whole cost.
 ' ========================================================================================
-private sub CCheckBox_FireToggle( byval pChk as CCHECKBOX ptr, byval hwnd as HWND )
+private sub PsCheckBox_FireToggle( byval pChk as PSCHECKBOX ptr, byval hwnd as HWND )
     if pChk = 0 then exit sub
     if pChk->isEnabled = false then exit sub
 
@@ -294,7 +294,7 @@ end sub
 
 
 ' ========================================================================================
-' CCheckBox Window procedure
+' PsCheckBox Window procedure
 '
 ' This control has no child windows, so there is nothing to subclass: every message is handled
 ' here and anything unhandled goes to DefWindowProc.
@@ -309,28 +309,28 @@ end sub
 ' THE WHOLE CLIENT IS THE HIT AREA, caption included, exactly as a system checkbox behaves.
 ' There is no hit test and no notion of clicking "the box" specifically.
 '
-' CS_DBLCLKS IS DELIBERATELY *NOT* SET, which is CToggle's and CIconPanel's call rather than
-' CSelectBar's. With it, the second of two rapid clicks arrives as WM_LBUTTONDBLCLK INSTEAD OF a
+' CS_DBLCLKS IS DELIBERATELY *NOT* SET, which is PsToggle's and PsIconPanel's call rather than
+' PsSelectBar's. With it, the second of two rapid clicks arrives as WM_LBUTTONDBLCLK INSTEAD OF a
 ' second WM_LBUTTONDOWN -- and on a control that flips once per click, a rapid second click is a
 ' legitimate second flip that would be silently swallowed.
 '
-' FOCUS: this is the fourth focusable control in the family, after CToggle, CComboBox and
-' CButton. See the WM_GETDLGCODE handler for the one subtlety that needed care, and the note in
-' CCheckBox.bi for why Enter activates here even though a system checkbox ignores it.
+' FOCUS: this is the fourth focusable control in the family, after PsToggle, PsComboBox and
+' PsButton. See the WM_GETDLGCODE handler for the one subtlety that needed care, and the note in
+' PsCheckBox.bi for why Enter activates here even though a system checkbox ignores it.
 ' ========================================================================================
-function CCheckBox_WndProc( _
+function PsCheckBox_WndProc( _
             byval hwnd   as HWND, _
             byval uMsg   as UINT, _
             byval wParam as WPARAM, _
             byval lParam as LPARAM _
             ) as LRESULT
 
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer( hwnd )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer( hwnd )
 
     select case uMsg
 
     case WM_PAINT
-        return CCheckBox_OnPaint( hwnd )
+        return PsCheckBox_OnPaint( hwnd )
 
     case WM_ERASEBKGND
         ' Never erase: WM_PAINT fills the whole client through the double buffer, so a background
@@ -357,7 +357,7 @@ function CCheckBox_WndProc( _
                 dim as RECT rcClient
                 GetClientRect( hwnd, @rcClient )
                 if isMouseOverRECT( hwnd, rcClient ) = false then
-                    CCheckBox_ClearHot( pChk, hwnd )
+                    PsCheckBox_ClearHot( pChk, hwnd )
                 end if
             end if
             return 0
@@ -382,7 +382,7 @@ function CCheckBox_WndProc( _
             ' Safety net: WM_MOUSELEAVE is not guaranteed to arrive when the mouse exits quickly
             ' (or onto another control), which would strand the control painted hot.
             if pChk->hotTimerOn = false then
-                SetTimer( hwnd, IDT_CCHECKBOX_HOTTRACK, CCHECKBOX_HOTTRACK_MS, NULL )
+                SetTimer( hwnd, IDT_CCHECKBOX_HOTTRACK, PSCHECKBOX_HOTTRACK_MS, NULL )
                 pChk->hotTimerOn = true
             end if
         end if
@@ -395,20 +395,20 @@ function CCheckBox_WndProc( _
             InvalidateRect( hwnd, NULL, FALSE )
         end if
 
-        if CCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam ) then return 0
+        if PsCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam ) then return 0
 
     case WM_MOUSELEAVE
         if pChk then
             ' Fast path for clearing the hot state (the WM_TIMER poll is the fallback for when
             ' this message never arrives). Suppressed during a press for the same reason as in
             ' the timer: the gesture is still live and WM_MOUSEMOVE owns isHot.
-            if pChk->isPressed = false then CCheckBox_ClearHot( pChk, hwnd )
-            if CCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam ) then return 0
+            if pChk->isPressed = false then PsCheckBox_ClearHot( pChk, hwnd )
+            if PsCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam ) then return 0
         end if
 
     case WM_LBUTTONDOWN
         if pChk = 0 then return 0
-        ' A disabled window does not receive mouse input at all (CCheckBox_SetEnabled calls
+        ' A disabled window does not receive mouse input at all (PsCheckBox_SetEnabled calls
         ' EnableWindow), so this is belt-and-braces against a host that disabled us by some other
         ' route.
         if pChk->isEnabled = false then return 0
@@ -420,7 +420,7 @@ function CCheckBox_WndProc( _
 
         ' Suppressing the press is allowed: no capture has been taken yet, so there is no
         ' bookkeeping to strand.
-        if CCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam ) then return 0
+        if PsCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam ) then return 0
 
         SetCapture( hwnd )
         pChk->isPressed = true
@@ -447,11 +447,11 @@ function CCheckBox_WndProc( _
         InvalidateRect( hwnd, NULL, FALSE )
 
         ' The result is deliberately IGNORED here (see CHK_MessageCallbackFunc).
-        CCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam )
+        PsCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam )
 
         ' Only a matched press+release with the cursor still inside flips the state. Press, slide
         ' off, release = nothing happened, which is the whole reason for capture.
-        if (bWasPressed andalso bInside) then CCheckBox_FireToggle( pChk, hwnd )
+        if (bWasPressed andalso bInside) then PsCheckBox_FireToggle( pChk, hwnd )
         return 0
 
     case WM_CAPTURECHANGED
@@ -464,10 +464,10 @@ function CCheckBox_WndProc( _
         end if
 
     case WM_RBUTTONDOWN, WM_RBUTTONUP
-        ' Reported, never acted on: a context menu is the host's business (CPopupMenu). No
+        ' Reported, never acted on: a context menu is the host's business (PsPopupMenu). No
         ' capture is taken for the right button, so an up can arrive without a down.
         if pChk then
-            if CCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam ) then return 0
+            if PsCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam ) then return 0
         end if
 
     case WM_SETFOCUS, WM_KILLFOCUS
@@ -480,7 +480,7 @@ function CCheckBox_WndProc( _
                 pChk->isFocused = bFocused
                 InvalidateRect( hwnd, NULL, FALSE )
             end if
-            CCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam )
+            PsCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam )
             return 0
         end if
 
@@ -506,23 +506,23 @@ function CCheckBox_WndProc( _
     case WM_KEYDOWN
         if pChk = 0 then exit select
         if pChk->isEnabled = false then return 0
-        if CCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam ) then return 0
+        if PsCheckBox_CallMessage( pChk, hwnd, uMsg, wParam, lParam ) then return 0
         select case wParam
         case VK_SPACE, VK_RETURN
             ' Same path a completed click takes, so keyboard and mouse cannot drift apart: both
             ' are user action, both notify.
             '
             ' VK_RETURN is here by choice, not by inheritance -- a system checkbox ignores Enter
-            ' and lets it reach the dialog's default button. CToggle and CButton both take it, so
+            ' and lets it reach the dialog's default button. PsToggle and PsButton both take it, so
             ' taking it here keeps the focusable half of the family consistent. See the API
-            ' header in CCheckBox.bi.
-            CCheckBox_FireToggle( pChk, hwnd )
+            ' header in PsCheckBox.bi.
+            PsCheckBox_FireToggle( pChk, hwnd )
             return 0
         end select
 
     case WM_ENABLE
         ' Keeps our own flag true to the window's real state, so a host that reaches for
-        ' EnableWindow directly instead of CCheckBox_SetEnabled still gets the greyed rendering
+        ' EnableWindow directly instead of PsCheckBox_SetEnabled still gets the greyed rendering
         ' rather than a control that looks live but eats input.
         if pChk then
             pChk->isEnabled = (wParam <> 0)
@@ -534,7 +534,7 @@ function CCheckBox_WndProc( _
         end if
 
     case WM_SETTEXT
-        ' The caption has ONE store, reached through two doors: CCheckBox_SetText and this
+        ' The caption has ONE store, reached through two doors: PsCheckBox_SetText and this
         ' message. DefWindowProc is deliberately not called -- letting it keep a second copy in
         ' the window's own text would give GetWindowText an answer that could drift from what is
         ' painted.
@@ -545,7 +545,7 @@ function CCheckBox_WndProc( _
             pChk->wszText = *cast( wstring ptr, lParam )
         end if
         pChk->Refresh()
-        CCheckBox_ApplyAutoSize( pChk )
+        PsCheckBox_ApplyAutoSize( pChk )
         return TRUE
 
     case WM_GETTEXT
@@ -587,7 +587,7 @@ function CCheckBox_WndProc( _
                 ' Store in an instance-lifetime buffer and point lpszText at it. NOT in
                 ' wszTooltip: that field is the host's authored text, and a callback's answer
                 ' written there would silently become stored state.
-                pChk->wszTipBuf = CCheckBox_ResolveTooltipText( pChk )
+                pChk->wszTipBuf = PsCheckBox_ResolveTooltipText( pChk )
                 pdi->lpszText = cast( LPWSTR, pChk->wszTipBuf.vptr )
                 pdi->hinst    = NULL
             end if
@@ -630,9 +630,9 @@ end function
 ' ========================================================================================
 ' Create a tooltip that pulls its text on demand (LPSTR_TEXTCALLBACK) for the whole control.
 ' TTN_GETDISPINFOW therefore goes to TOOLINFO.hwnd, which is the control itself (NOT the parent
-' form), and CCheckBox_WndProc answers it.
+' form), and PsCheckBox_WndProc answers it.
 ' ========================================================================================
-private function CCheckBox_AddTooltip( byval hCtrl as HWND ) as HWND
+private function PsCheckBox_AddTooltip( byval hCtrl as HWND ) as HWND
     if IsWindow(hCtrl) = 0 then return 0
     dim as HWND hTooltip = CreateWindowExW( 0, "tooltips_class32", "", _
                                             WS_POPUP or TTS_ALWAYSTIP, _
@@ -658,9 +658,9 @@ end function
 
 
 ' ========================================================================================
-' CCheckBox_Create
+' PsCheckBox_Create
 ' ========================================================================================
-function CCheckBox_Create( byval hWndParent as HWND, byval CtrlID as long ) as HWND
+function PsCheckBox_Create( byval hWndParent as HWND, byval CtrlID as long ) as HWND
 
     dim pWindow as CWindow ptr = New CWindow
 
@@ -670,19 +670,19 @@ function CCheckBox_Create( byval hWndParent as HWND, byval CtrlID as long ) as H
     ' dwExStyle parameter to WS_EX_CONTROLPARENT OR WS_EX_WINDOWEDGE, so a control that supplies
     ' only dwStyle silently declares itself a CONTAINER. The dialog manager then descends into
     ' it hunting for tabstops, finds no children, and SKIPS IT: the control becomes unreachable
-    ' by Tab. That shipped in CButton's first commit and was then found in CToggle and CComboBox
+    ' by Tab. That shipped in PsButton's first commit and was then found in PsToggle and PsComboBox
     ' too; see C:\dev\Learnings.md. It is ASSERTED in the self-test below, not merely remembered.
     '
     ' A leaf control must be a tab ITEM, not a tab container. WS_EX_WINDOWEDGE goes with it -- it
     ' is a raised-border hint that means nothing to a window drawing its own chrome.
     '
-    ' DO NOT COPY THIS LINE INTO A WRAP-A-REAL-CHILD CONTROL. CListBox, CTextBox and
-    ' CNumericUpDown all NEED WS_EX_CONTROLPARENT, because their tabstop lives on an inner child
+    ' DO NOT COPY THIS LINE INTO A WRAP-A-REAL-CHILD CONTROL. PsListBox, PsTextBox and
+    ' PsNumericUpDown all NEED WS_EX_CONTROLPARENT, because their tabstop lives on an inner child
     ' and their container is a real container; passing 0 there would make them unreachable. The
     ' test is "does this window have children the dialog manager should find?", not "is this a
     ' control?".
     dim as HWND hCtrl = _
-            pWindow->Create( hWndParent, "", @CCheckBox_WndProc, _
+            pWindow->Create( hWndParent, "", @PsCheckBox_WndProc, _
             0, 0, 0, 0, WS_CHILD or WS_TABSTOP or WS_CLIPSIBLINGS or WS_CLIPCHILDREN, _
             0 _
             )
@@ -690,30 +690,30 @@ function CCheckBox_Create( byval hWndParent as HWND, byval CtrlID as long ) as H
     ' NOTE: CS_DBLCLKS is deliberately NOT enabled here -- see the WndProc header. It would turn
     ' every second rapid click into a WM_LBUTTONDBLCLK the control would drop.
 
-    dim as CCHECKBOX ptr pChk = new CCHECKBOX
+    dim as PSCHECKBOX ptr pChk = new PSCHECKBOX
     pChk->hWin         = hCtrl
     pChk->idc_CheckBox = CtrlID
-    pChk->id           = CtrlID     ' sensible default; CCheckBox_SetID overrides it
+    pChk->id           = CtrlID     ' sensible default; PsCheckBox_SetID overrides it
 
     ' The two box glyphs. Seeded here rather than as TYPE field initializers -- a DWSTRING member
     ' cannot carry one.
-    pChk->wszGlyphUnchecked = CCHECKBOX_GLYPH_UNCHECKED
-    pChk->wszGlyphChecked   = CCHECKBOX_GLYPH_CHECKED
+    pChk->wszGlyphUnchecked = PSCHECKBOX_GLYPH_UNCHECKED
+    pChk->wszGlyphChecked   = PSCHECKBOX_GLYPH_CHECKED
 
     ' Only the Create-time defaults are DPI-scaled for us; every setter afterwards takes raw
     ' pixels and the caller scales (the family rule). nFocusThick is not scaled at all, here or
     ' anywhere -- a hairline stays a hairline.
-    pChk->nPadLeft        = pWindow->ScaleX( CCHECKBOX_DEFAULT_PADLEFT )
-    pChk->nPadTop         = pWindow->ScaleY( CCHECKBOX_DEFAULT_PADTOP )
-    pChk->nPadRight       = pWindow->ScaleX( CCHECKBOX_DEFAULT_PADRIGHT )
-    pChk->nPadBottom      = pWindow->ScaleY( CCHECKBOX_DEFAULT_PADBOTTOM )
-    pChk->nBoxGap         = pWindow->ScaleX( CCHECKBOX_DEFAULT_BOXGAP )
-    pChk->nBoxWidth       = pWindow->ScaleX( CCHECKBOX_DEFAULT_BOXWIDTH )
-    pChk->nBoxHeight      = pWindow->ScaleY( CCHECKBOX_DEFAULT_BOXHEIGHT )
-    pChk->nFocusGap       = pWindow->ScaleY( CCHECKBOX_DEFAULT_FOCUSGAP )
-    pChk->nFocusCurvature = pWindow->ScaleY( CCHECKBOX_DEFAULT_FOCUSCURV )
+    pChk->nPadLeft        = pWindow->ScaleX( PSCHECKBOX_DEFAULT_PADLEFT )
+    pChk->nPadTop         = pWindow->ScaleY( PSCHECKBOX_DEFAULT_PADTOP )
+    pChk->nPadRight       = pWindow->ScaleX( PSCHECKBOX_DEFAULT_PADRIGHT )
+    pChk->nPadBottom      = pWindow->ScaleY( PSCHECKBOX_DEFAULT_PADBOTTOM )
+    pChk->nBoxGap         = pWindow->ScaleX( PSCHECKBOX_DEFAULT_BOXGAP )
+    pChk->nBoxWidth       = pWindow->ScaleX( PSCHECKBOX_DEFAULT_BOXWIDTH )
+    pChk->nBoxHeight      = pWindow->ScaleY( PSCHECKBOX_DEFAULT_BOXHEIGHT )
+    pChk->nFocusGap       = pWindow->ScaleY( PSCHECKBOX_DEFAULT_FOCUSGAP )
+    pChk->nFocusCurvature = pWindow->ScaleY( PSCHECKBOX_DEFAULT_FOCUSCURV )
 
-    pChk->hToolTip = CCheckBox_AddTooltip( hCtrl )
+    pChk->hToolTip = PsCheckBox_AddTooltip( hCtrl )
 
     SetWindowLongPtr( hCtrl, GWLP_ID, CtrlID )
 
@@ -728,30 +728,30 @@ end function
 ' ========================================================================================
 ' Content.  All SILENT -- they change what is drawn, never what was clicked.
 ' ========================================================================================
-function CCheckBox_GetText( byval hCheckBox as HWND ) as DWSTRING
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetText( byval hCheckBox as HWND ) as DWSTRING
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return ""
     dim as DWSTRING wszOut = pChk->wszText
     return wszOut
 end function
 
-sub CCheckBox_SetText( byval hCheckBox as HWND, byval Text as DWSTRING )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetText( byval hCheckBox as HWND, byval Text as DWSTRING )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->wszText = Text
     pChk->Refresh()
-    CCheckBox_ApplyAutoSize( pChk )
+    PsCheckBox_ApplyAutoSize( pChk )
 end sub
 
-function CCheckBox_GetGlyphUnchecked( byval hCheckBox as HWND ) as DWSTRING
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetGlyphUnchecked( byval hCheckBox as HWND ) as DWSTRING
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return ""
     dim as DWSTRING wszOut = pChk->wszGlyphUnchecked
     return wszOut
 end function
 
-sub CCheckBox_SetGlyphUnchecked( byval hCheckBox as HWND, byval Glyph as DWSTRING )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetGlyphUnchecked( byval hCheckBox as HWND, byval Glyph as DWSTRING )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->wszGlyphUnchecked = Glyph
     ' No re-measure and no auto-size: the cell is DECLARED, so a different glyph cannot change
@@ -759,40 +759,40 @@ sub CCheckBox_SetGlyphUnchecked( byval hCheckBox as HWND, byval Glyph as DWSTRIN
     InvalidateRect( hCheckBox, NULL, FALSE )
 end sub
 
-function CCheckBox_GetGlyphChecked( byval hCheckBox as HWND ) as DWSTRING
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetGlyphChecked( byval hCheckBox as HWND ) as DWSTRING
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return ""
     dim as DWSTRING wszOut = pChk->wszGlyphChecked
     return wszOut
 end function
 
-sub CCheckBox_SetGlyphChecked( byval hCheckBox as HWND, byval Glyph as DWSTRING )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetGlyphChecked( byval hCheckBox as HWND, byval Glyph as DWSTRING )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->wszGlyphChecked = Glyph
     InvalidateRect( hCheckBox, NULL, FALSE )
 end sub
 
-function CCheckBox_GetID( byval hCheckBox as HWND ) as long
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetID( byval hCheckBox as HWND ) as long
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return 0
     return pChk->id
 end function
 
-sub CCheckBox_SetID( byval hCheckBox as HWND, byval id as long )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetID( byval hCheckBox as HWND, byval id as long )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->id = id
 end sub
 
-function CCheckBox_GetItemData( byval hCheckBox as HWND ) as integer
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetItemData( byval hCheckBox as HWND ) as integer
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return 0
     return pChk->itemData
 end function
 
-sub CCheckBox_SetItemData( byval hCheckBox as HWND, byval itemData as integer )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetItemData( byval hCheckBox as HWND, byval itemData as integer )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->itemData = itemData
 end sub
@@ -801,24 +801,24 @@ end sub
 ' ========================================================================================
 ' State.
 ' ========================================================================================
-function CCheckBox_GetChecked( byval hCheckBox as HWND ) as boolean
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetChecked( byval hCheckBox as HWND ) as boolean
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return false
     return pChk->isChecked
 end function
 
 ' SILENT, by the family rule and by Win32's BM_SETCHECK precedent. The action that notifies is
-' CCheckBox_Toggle. No re-measure: the two glyphs share one declared cell, so nothing moves.
-sub CCheckBox_SetChecked( byval hCheckBox as HWND, byval isChecked as boolean )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+' PsCheckBox_Toggle. No re-measure: the two glyphs share one declared cell, so nothing moves.
+sub PsCheckBox_SetChecked( byval hCheckBox as HWND, byval isChecked as boolean )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     if pChk->isChecked = isChecked then exit sub
     pChk->isChecked = isChecked
     InvalidateRect( hCheckBox, NULL, FALSE )
 end sub
 
-function CCheckBox_GetEnabled( byval hCheckBox as HWND ) as boolean
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetEnabled( byval hCheckBox as HWND ) as boolean
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return false
     return pChk->isEnabled
 end function
@@ -826,64 +826,64 @@ end function
 ' Through EnableWindow, so the disable is enforced by the system rather than being a cosmetic
 ' flag. WM_ENABLE (sent synchronously) is what actually updates isEnabled, clears the hover and
 ' cancels any live press.
-sub CCheckBox_SetEnabled( byval hCheckBox as HWND, byval isEnabled as boolean )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetEnabled( byval hCheckBox as HWND, byval isEnabled as boolean )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     EnableWindow( hCheckBox, iif( isEnabled, TRUE, FALSE ) )
-    CCheckBox_ClearHot( pChk, hCheckBox )
+    PsCheckBox_ClearHot( pChk, hCheckBox )
     InvalidateRect( hCheckBox, NULL, FALSE )
 end sub
 
-function CCheckBox_GetFocused( byval hCheckBox as HWND ) as boolean
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetFocused( byval hCheckBox as HWND ) as boolean
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return false
     return pChk->isFocused
 end function
 
-sub CCheckBox_Refresh( byval hCheckBox as HWND )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_Refresh( byval hCheckBox as HWND )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->Refresh()
 end sub
 
 
 ' ========================================================================================
-' Action.  Fires the change callback -- see the declaration in CCheckBox.bi for why an action is
-' not a setter, and CCheckBox_SetChecked for the silent version.
+' Action.  Fires the change callback -- see the declaration in PsCheckBox.bi for why an action is
+' not a setter, and PsCheckBox_SetChecked for the silent version.
 ' ========================================================================================
-sub CCheckBox_Toggle( byval hCheckBox as HWND )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_Toggle( byval hCheckBox as HWND )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
-    CCheckBox_FireToggle( pChk, hCheckBox )
+    PsCheckBox_FireToggle( pChk, hCheckBox )
 end sub
 
 
 ' ========================================================================================
 ' Layout.  Every setter takes RAW PIXELS.
 ' ========================================================================================
-function CCheckBox_GetBoxAlign( byval hCheckBox as HWND ) as long
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetBoxAlign( byval hCheckBox as HWND ) as long
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return CHK_BOXALIGN_LEFT
     return pChk->nBoxAlign
 end function
 
 ' No auto-size call: the mirror is exact, so flipping sides cannot change the ideal size.
-sub CCheckBox_SetBoxAlign( byval hCheckBox as HWND, byval nBoxAlign as long )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetBoxAlign( byval hCheckBox as HWND, byval nBoxAlign as long )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     if (nBoxAlign < CHK_BOXALIGN_LEFT) orelse (nBoxAlign > CHK_BOXALIGN_RIGHT) then exit sub
     pChk->nBoxAlign = nBoxAlign
     pChk->Refresh()
 end sub
 
-function CCheckBox_GetTextAlign( byval hCheckBox as HWND ) as long
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetTextAlign( byval hCheckBox as HWND ) as long
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return CHK_TEXTALIGN_LEFT
     return pChk->nTextAlign
 end function
 
-sub CCheckBox_SetTextAlign( byval hCheckBox as HWND, byval nTextAlign as long )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetTextAlign( byval hCheckBox as HWND, byval nTextAlign as long )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     if (nTextAlign < CHK_TEXTALIGN_LEFT) orelse (nTextAlign > CHK_TEXTALIGN_RIGHT) then exit sub
     pChk->nTextAlign = nTextAlign
@@ -891,9 +891,9 @@ sub CCheckBox_SetTextAlign( byval hCheckBox as HWND, byval nTextAlign as long )
     InvalidateRect( hCheckBox, NULL, FALSE )
 end sub
 
-sub CCheckBox_GetPadding( byval hCheckBox as HWND, byref nLeft as long, byref nTop as long, byref nRight as long, byref nBottom as long )
+sub PsCheckBox_GetPadding( byval hCheckBox as HWND, byref nLeft as long, byref nTop as long, byref nRight as long, byref nBottom as long )
     nLeft = 0 : nTop = 0 : nRight = 0 : nBottom = 0
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     nLeft   = pChk->nPadLeft
     nTop    = pChk->nPadTop
@@ -901,8 +901,8 @@ sub CCheckBox_GetPadding( byval hCheckBox as HWND, byref nLeft as long, byref nT
     nBottom = pChk->nPadBottom
 end sub
 
-sub CCheckBox_SetPadding( byval hCheckBox as HWND, byval nLeft as long, byval nTop as long, byval nRight as long, byval nBottom as long )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetPadding( byval hCheckBox as HWND, byval nLeft as long, byval nTop as long, byval nRight as long, byval nBottom as long )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     if nLeft   < 0 then nLeft   = 0
     if nTop    < 0 then nTop    = 0
@@ -913,70 +913,70 @@ sub CCheckBox_SetPadding( byval hCheckBox as HWND, byval nLeft as long, byval nT
     pChk->nPadRight  = nRight
     pChk->nPadBottom = nBottom
     pChk->Refresh()
-    CCheckBox_ApplyAutoSize( pChk )
+    PsCheckBox_ApplyAutoSize( pChk )
 end sub
 
-function CCheckBox_GetBoxGap( byval hCheckBox as HWND ) as long
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetBoxGap( byval hCheckBox as HWND ) as long
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return 0
     return pChk->nBoxGap
 end function
 
-sub CCheckBox_SetBoxGap( byval hCheckBox as HWND, byval nBoxGap as long )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetBoxGap( byval hCheckBox as HWND, byval nBoxGap as long )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     if nBoxGap < 0 then nBoxGap = 0
     pChk->nBoxGap = nBoxGap
     pChk->Refresh()
-    CCheckBox_ApplyAutoSize( pChk )
+    PsCheckBox_ApplyAutoSize( pChk )
 end sub
 
-sub CCheckBox_GetBoxSize( byval hCheckBox as HWND, byref nBoxWidth as long, byref nBoxHeight as long )
+sub PsCheckBox_GetBoxSize( byval hCheckBox as HWND, byref nBoxWidth as long, byref nBoxHeight as long )
     nBoxWidth = 0 : nBoxHeight = 0
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     nBoxWidth  = pChk->nBoxWidth
     nBoxHeight = pChk->nBoxHeight
 end sub
 
-sub CCheckBox_SetBoxSize( byval hCheckBox as HWND, byval nBoxWidth as long, byval nBoxHeight as long )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetBoxSize( byval hCheckBox as HWND, byval nBoxWidth as long, byval nBoxHeight as long )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     if nBoxWidth  < 0 then nBoxWidth  = 0
     if nBoxHeight < 0 then nBoxHeight = 0
     pChk->nBoxWidth  = nBoxWidth
     pChk->nBoxHeight = nBoxHeight
     pChk->Refresh()
-    CCheckBox_ApplyAutoSize( pChk )
+    PsCheckBox_ApplyAutoSize( pChk )
 end sub
 
-sub CCheckBox_GetFocusRing( byval hCheckBox as HWND, byref nGap as long, byref nThickness as long )
+sub PsCheckBox_GetFocusRing( byval hCheckBox as HWND, byref nGap as long, byref nThickness as long )
     nGap = 0 : nThickness = 0
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     nGap       = pChk->nFocusGap
     nThickness = pChk->nFocusThick
 end sub
 
-sub CCheckBox_SetFocusRing( byval hCheckBox as HWND, byval nGap as long, byval nThickness as long )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetFocusRing( byval hCheckBox as HWND, byval nGap as long, byval nThickness as long )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     if nGap       < 0 then nGap       = 0
     if nThickness < 0 then nThickness = 0
     pChk->nFocusGap   = nGap
     pChk->nFocusThick = nThickness
     pChk->Refresh()
-    CCheckBox_ApplyAutoSize( pChk )
+    PsCheckBox_ApplyAutoSize( pChk )
 end sub
 
-function CCheckBox_GetFocusCurvature( byval hCheckBox as HWND ) as long
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetFocusCurvature( byval hCheckBox as HWND ) as long
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return 0
     return pChk->nFocusCurvature
 end function
 
-sub CCheckBox_SetFocusCurvature( byval hCheckBox as HWND, byval nCurvature as long )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetFocusCurvature( byval hCheckBox as HWND, byval nCurvature as long )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     if nCurvature < 0 then nCurvature = 0
     pChk->nFocusCurvature = nCurvature
@@ -984,33 +984,33 @@ sub CCheckBox_SetFocusCurvature( byval hCheckBox as HWND, byval nCurvature as lo
     InvalidateRect( hCheckBox, NULL, FALSE )
 end sub
 
-function CCheckBox_GetAutoSize( byval hCheckBox as HWND ) as boolean
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetAutoSize( byval hCheckBox as HWND ) as boolean
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return false
     return pChk->bAutoSize
 end function
 
-sub CCheckBox_SetAutoSize( byval hCheckBox as HWND, byval bAutoSize as boolean )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetAutoSize( byval hCheckBox as HWND, byval bAutoSize as boolean )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->bAutoSize = bAutoSize
-    CCheckBox_ApplyAutoSize( pChk )
+    PsCheckBox_ApplyAutoSize( pChk )
 end sub
 
 ' Forces a pending layout. Valid BEFORE the control has ever been sized -- the measuring pass in
 ' LayoutCheckBox runs ahead of the zero-client bail precisely so this is answerable.
-sub CCheckBox_GetIdealSize( byval hCheckBox as HWND, byref nWidth as long, byref nHeight as long )
+sub PsCheckBox_GetIdealSize( byval hCheckBox as HWND, byref nWidth as long, byref nHeight as long )
     nWidth = 0 : nHeight = 0
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     if pChk->bLayoutDirty then pChk->LayoutCheckBox()
     nWidth  = pChk->nIdealW
     nHeight = pChk->nIdealH
 end sub
 
-function CCheckBox_GetContentRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
+function PsCheckBox_GetContentRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
     SetRectEmpty( @rc )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return false
     if pChk->bLayoutDirty then pChk->LayoutCheckBox()
     if pChk->bLayoutDirty then return false          ' no client area yet
@@ -1018,9 +1018,9 @@ function CCheckBox_GetContentRect( byval hCheckBox as HWND, byref rc as RECT ) a
     return true
 end function
 
-function CCheckBox_GetBoxRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
+function PsCheckBox_GetBoxRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
     SetRectEmpty( @rc )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return false
     if pChk->bLayoutDirty then pChk->LayoutCheckBox()
     if pChk->bLayoutDirty then return false
@@ -1028,9 +1028,9 @@ function CCheckBox_GetBoxRect( byval hCheckBox as HWND, byref rc as RECT ) as bo
     return true
 end function
 
-function CCheckBox_GetTextRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
+function PsCheckBox_GetTextRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
     SetRectEmpty( @rc )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return false
     if pChk->bLayoutDirty then pChk->LayoutCheckBox()
     if pChk->bLayoutDirty then return false
@@ -1038,9 +1038,9 @@ function CCheckBox_GetTextRect( byval hCheckBox as HWND, byref rc as RECT ) as b
     return true
 end function
 
-function CCheckBox_GetVisualRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
+function PsCheckBox_GetVisualRect( byval hCheckBox as HWND, byref rc as RECT ) as boolean
     SetRectEmpty( @rc )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return false
     if pChk->bLayoutDirty then pChk->LayoutCheckBox()
     if pChk->bLayoutDirty then return false
@@ -1052,46 +1052,46 @@ end function
 ' ========================================================================================
 ' Appearance.
 ' ========================================================================================
-sub CCheckBox_GetColors( byval hCheckBox as HWND, byval pColors as CCHECKBOX_COLORS ptr )
+sub PsCheckBox_GetColors( byval hCheckBox as HWND, byval pColors as PSCHECKBOX_COLORS ptr )
     if pColors = 0 then exit sub
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     *pColors = pChk->colors
 end sub
 
-sub CCheckBox_SetColors( byval hCheckBox as HWND, byval pColors as CCHECKBOX_COLORS ptr )
+sub PsCheckBox_SetColors( byval hCheckBox as HWND, byval pColors as PSCHECKBOX_COLORS ptr )
     if pColors = 0 then exit sub
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->colors = *pColors
     InvalidateRect( hCheckBox, NULL, TRUE )
 end sub
 
-function CCheckBox_GetFont( byval hCheckBox as HWND ) as HFONT
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetFont( byval hCheckBox as HWND ) as HFONT
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return 0
     return pChk->hTextFont
 end function
 
 ' The MEASURING font. Changing it re-measures, and can therefore change the ideal size.
-sub CCheckBox_SetFont( byval hCheckBox as HWND, byval hTextFont as HFONT )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetFont( byval hCheckBox as HWND, byval hTextFont as HFONT )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->hTextFont = hTextFont
     pChk->Refresh()
-    CCheckBox_ApplyAutoSize( pChk )
+    PsCheckBox_ApplyAutoSize( pChk )
 end sub
 
-function CCheckBox_GetGlyphFont( byval hCheckBox as HWND ) as HFONT
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetGlyphFont( byval hCheckBox as HWND ) as HFONT
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return 0
     return pChk->hGlyphFont
 end function
 
-' A PAINT-TIME input only (CIconPanel's rule): the box cell is declared rather than measured, so
+' A PAINT-TIME input only (PsIconPanel's rule): the box cell is declared rather than measured, so
 ' this repaints but never re-lays-out and never resizes.
-sub CCheckBox_SetGlyphFont( byval hCheckBox as HWND, byval hGlyphFont as HFONT )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetGlyphFont( byval hCheckBox as HWND, byval hGlyphFont as HFONT )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->hGlyphFont = hGlyphFont
     InvalidateRect( hCheckBox, NULL, FALSE )
@@ -1101,27 +1101,27 @@ end sub
 ' ========================================================================================
 ' Tooltips.
 ' ========================================================================================
-function CCheckBox_GetTooltipText( byval hCheckBox as HWND ) as DWSTRING
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetTooltipText( byval hCheckBox as HWND ) as DWSTRING
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return ""
     dim as DWSTRING wszOut = pChk->wszTooltip
     return wszOut
 end function
 
-sub CCheckBox_SetTooltipText( byval hCheckBox as HWND, byval Text as DWSTRING )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetTooltipText( byval hCheckBox as HWND, byval Text as DWSTRING )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->wszTooltip = Text
 end sub
 
-function CCheckBox_GetTooltipHandle( byval hCheckBox as HWND ) as HWND
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+function PsCheckBox_GetTooltipHandle( byval hCheckBox as HWND ) as HWND
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return 0
     return pChk->hToolTip
 end function
 
-sub CCheckBox_SetHoverTime( byval hCheckBox as HWND, byval milliseconds as long )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetHoverTime( byval hCheckBox as HWND, byval milliseconds as long )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->HoverTime = milliseconds
     if IsWindow(pChk->hToolTip) then
@@ -1133,27 +1133,27 @@ end sub
 ' ========================================================================================
 ' Callbacks.
 ' ========================================================================================
-sub CCheckBox_SetPaintCallback( byval hCheckBox as HWND, byval usersub as CHK_PaintCallbackSub )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetPaintCallback( byval hCheckBox as HWND, byval usersub as CHK_PaintCallbackSub )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->PaintCallback = usersub
     InvalidateRect( hCheckBox, NULL, TRUE )
 end sub
 
-sub CCheckBox_SetMessageCallback( byval hCheckBox as HWND, byval userfunc as CHK_MessageCallbackFunc )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetMessageCallback( byval hCheckBox as HWND, byval userfunc as CHK_MessageCallbackFunc )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->MessageCallback = userfunc
 end sub
 
-sub CCheckBox_SetTooltipCallback( byval hCheckBox as HWND, byval userfunc as CHK_TooltipCallbackFunc )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetTooltipCallback( byval hCheckBox as HWND, byval userfunc as CHK_TooltipCallbackFunc )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->TooltipCallback = userfunc
 end sub
 
-sub CCheckBox_SetCheckChangedCallback( byval hCheckBox as HWND, byval usersub as CHK_CheckChangedCallbackSub )
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+sub PsCheckBox_SetCheckChangedCallback( byval hCheckBox as HWND, byval usersub as CHK_CheckChangedCallbackSub )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
     pChk->CheckChangedCallback = usersub
 end sub
@@ -1163,7 +1163,7 @@ end sub
 ' Which rect does this part name? Shared by the two probes and nothing else, but factored out so
 ' their bodies stay about pixels rather than about rect selection.
 ' ========================================================================================
-private function CCheckBox_PartRect( byval pChk as CCHECKBOX ptr, byval nPart as long ) as RECT
+private function PsCheckBox_PartRect( byval pChk as PSCHECKBOX ptr, byval nPart as long ) as RECT
     dim as RECT rc
     SetRectEmpty( @rc )
     if pChk = 0 then return rc
@@ -1186,7 +1186,7 @@ end function
 '
 ' THREE THINGS HERE ARE LOAD-BEARING, and all three come from the write-ups in Learnings.md:
 '
-'   1. The PAINTINFO is filled by CCheckBox_FillPaintInfo -- the SAME routine WM_PAINT uses. The
+'   1. The PAINTINFO is filled by PsCheckBox_FillPaintInfo -- the SAME routine WM_PAINT uses. The
 '      first version of this probe elsewhere in the family hand-built the struct and left
 '      rcVisual zeroed; PaintRectFactory bails on a negative extent, so the focus-ring call
 '      became a no-op and the A/B came back identical. A probe that skips the code path it exists
@@ -1201,7 +1201,7 @@ end function
 ' Returns FALSE (and leaves both outputs at 0) if the control has no geometry yet or the part
 ' rect is empty.
 ' ========================================================================================
-private function CCheckBox_ProbePart( _
+private function PsCheckBox_ProbePart( _
             byval hCheckBox as HWND, _
             byval nPart     as long, _
             byref nTones    as long, _
@@ -1211,7 +1211,7 @@ private function CCheckBox_ProbePart( _
     nTones = 0
     nHash  = 0
 
-    dim as CCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return false
     if pChk->bLayoutDirty then pChk->LayoutCheckBox()
     if pChk->bLayoutDirty then return false          ' no client area yet
@@ -1222,7 +1222,7 @@ private function CCheckBox_ProbePart( _
     dim as long ch = rcClient.bottom - rcClient.top
     if (cw <= 0) orelse (ch <= 0) then return false
 
-    dim as RECT rcPart = CCheckBox_PartRect( pChk, nPart )
+    dim as RECT rcPart = PsCheckBox_PartRect( pChk, nPart )
     if IsRectEmpty( @rcPart ) then return false
 
     ' Clamp to the client: rcVisual-derived rects can legitimately extend past it when the host
@@ -1241,7 +1241,7 @@ private function CCheckBox_ProbePart( _
         return false
     end if
 
-    ' 32bpp top-down, matching what CBufferPaint.SetupBitmap builds, so the pixels we read are
+    ' 32bpp top-down, matching what PsBufferPaint.SetupBitmap builds, so the pixels we read are
     ' laid out the way the renderer wrote them.
     dim as BITMAPINFO bmi
     with bmi.bmiHeader
@@ -1266,24 +1266,24 @@ private function CCheckBox_ProbePart( _
     pChk->isFocused = true
 
     scope
-        dim as CBufferPaint b
+        dim as PsBufferPaint b
         ' Four-arg form: hMem is BOTH the blit target and the cached back buffer, so the final
         ' BitBlt is a self-copy and the bitmap survives EndDoubleBuffer for us to read.
         b.BeginDoubleBuffer( hCheckBox, hMem, rcClient, hMem )
 
-        dim as long nMood = CCheckBox_ResolveMood( pChk->isEnabled, pChk->isPressed, pChk->isHot )
+        dim as long nMood = PsCheckBox_ResolveMood( pChk->isEnabled, pChk->isPressed, pChk->isHot )
         dim as COLORREF clrFill, clrFore, clrBox
-        CCheckBox_ResolveColors( @pChk->colors, nMood, pChk->isChecked, clrFill, clrFore, clrBox )
+        PsCheckBox_ResolveColors( @pChk->colors, nMood, pChk->isChecked, clrFill, clrFore, clrBox )
         b.SetBackColor( clrFill )
         b.PaintClientRect()
 
-        dim p as CCHECKBOX_PAINTINFO
-        CCheckBox_FillPaintInfo( pChk, hCheckBox, @b, @p )
+        dim p as PSCHECKBOX_PAINTINFO
+        PsCheckBox_FillPaintInfo( pChk, hCheckBox, @b, @p )
 
         if pChk->PaintCallback then
             pChk->PaintCallback( @p )
         else
-            CCheckBox_RenderDefault( pChk, @b, @p )
+            PsCheckBox_RenderDefault( pChk, @b, @p )
         end if
 
         b.EndDoubleBuffer()
@@ -1332,29 +1332,29 @@ private function CCheckBox_ProbePart( _
 end function
 
 
-' See the header in CCheckBox.bi. A part wiped by a PaintBorderRect fill is literally ONE tone,
+' See the header in PsCheckBox.bi. A part wiped by a PaintBorderRect fill is literally ONE tone,
 ' so the useful signal is the count LEAVING 1 -- not the count being large.
-function CCheckBox_CountRenderedTones( byval hCheckBox as HWND, byval nPart as long ) as long
+function PsCheckBox_CountRenderedTones( byval hCheckBox as HWND, byval nPart as long ) as long
     dim as long nTones = 0
     dim as ulong nHash = 0
-    if CCheckBox_ProbePart( hCheckBox, nPart, nTones, nHash ) = false then return 0
+    if PsCheckBox_ProbePart( hCheckBox, nPart, nTones, nHash ) = false then return 0
     return nTones
 end function
 
-' See the header in CCheckBox.bi. Compare two hashes of the SAME part taken in two different
+' See the header in PsCheckBox.bi. Compare two hashes of the SAME part taken in two different
 ' states: equal means the state change never reached the surface. It can only prove difference,
 ' never correctness. (0 is also the failure return; an FNV-1a of a non-empty region landing
 ' exactly on 0 is possible in principle and has been accepted rather than worked around.)
-function CCheckBox_HashRenderedPart( byval hCheckBox as HWND, byval nPart as long ) as ulong
+function PsCheckBox_HashRenderedPart( byval hCheckBox as HWND, byval nPart as long ) as ulong
     dim as long nTones = 0
     dim as ulong nHash = 0
-    if CCheckBox_ProbePart( hCheckBox, nPart, nTones, nHash ) = false then return 0
+    if PsCheckBox_ProbePart( hCheckBox, nPart, nTones, nHash ) = false then return 0
     return nHash
 end function
 
 
 ' ========================================================================================
-' Self-test.  Gated on CCHECKBOX_SELFTEST=1.
+' Self-test.  Gated on PSCHECKBOX_SELFTEST=1.
 ' ========================================================================================
 dim shared as long gCHK_TestCount
 dim shared as long gCHK_FailCount
@@ -1387,20 +1387,20 @@ private function CHKTest_RectStr( byref rc as RECT ) as string
 end function
 
 
-sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
-    if environ("CCHECKBOX_SELFTEST") <> "1" then exit sub
+sub PsCheckBox_RunSelfTest( byval hWndParent as HWND )
+    if environ("PSCHECKBOX_SELFTEST") <> "1" then exit sub
 
     gCHK_TestCount = 0
     gCHK_FailCount = 0
-    print "=== CCheckBox self-test ==="
+    print "=== PsCheckBox self-test ==="
 
-    dim as HWND h = CCheckBox_Create( hWndParent, 9901 )
+    dim as HWND h = PsCheckBox_Create( hWndParent, 9901 )
     if h = 0 then
-        print "FAIL  create   [CCheckBox_Create returned 0]"
+        print "FAIL  create   [PsCheckBox_Create returned 0]"
         exit sub
     end if
 
-    dim as CCHECKBOX ptr pC = GetCheckBoxPointer(h)
+    dim as PSCHECKBOX ptr pC = GetCheckBoxPointer(h)
     if pC = 0 then
         print "FAIL  pointer   [GetCheckBoxPointer returned 0]"
         DestroyWindow(h)
@@ -1416,13 +1416,13 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
     ' Pin every layout input to a known value so the arithmetic below is exact rather than
     ' DPI-dependent. Only the CAPTION stays measured, and every assertion that involves it is
     ' written against pC->nTextWidth / nTextHeight rather than against a literal.
-    CCheckBox_SetPadding( h, 10, 5, 10, 5 )
-    CCheckBox_SetBoxGap( h, 8 )
-    CCheckBox_SetBoxSize( h, 16, 16 )
-    CCheckBox_SetFocusRing( h, 2, 1 )              ' ringPad = 3
-    CCheckBox_SetFocusCurvature( h, 8 )
-    CCheckBox_SetBoxAlign( h, CHK_BOXALIGN_LEFT )
-    CCheckBox_SetTextAlign( h, CHK_TEXTALIGN_LEFT )
+    PsCheckBox_SetPadding( h, 10, 5, 10, 5 )
+    PsCheckBox_SetBoxGap( h, 8 )
+    PsCheckBox_SetBoxSize( h, 16, 16 )
+    PsCheckBox_SetFocusRing( h, 2, 1 )              ' ringPad = 3
+    PsCheckBox_SetFocusCurvature( h, 8 )
+    PsCheckBox_SetBoxAlign( h, CHK_BOXALIGN_LEFT )
+    PsCheckBox_SetTextAlign( h, CHK_TEXTALIGN_LEFT )
 
     ' PLAIN LETTERS, NOT THE FLUENT CODEPOINTS -- and this is NECESSARY, not merely tidy. The
     ' final probe asserts that the two states render DIFFERENTLY; with the default E739/E73A and
@@ -1432,14 +1432,14 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
     const GLYPH_OFF = "o"
     const GLYPH_ON  = "X"
     const CAPTION   = "Test Caption"
-    CCheckBox_SetGlyphUnchecked( h, GLYPH_OFF )
-    CCheckBox_SetGlyphChecked( h, GLYPH_ON )
+    PsCheckBox_SetGlyphUnchecked( h, GLYPH_OFF )
+    PsCheckBox_SetGlyphChecked( h, GLYPH_ON )
 
     dim as long ringPad = pC->RingPad()
 
     ' ---- 1. ideal size is valid BEFORE the control has ever been sized ------------------
-    CCheckBox_SetText( h, CAPTION )
-    CCheckBox_GetIdealSize( h, w, hh )
+    PsCheckBox_SetText( h, CAPTION )
+    PsCheckBox_GetIdealSize( h, w, hh )
     sD = "w=" & str(w) & " h=" & str(hh)
     CHKTest_Check( "ideal size before first size", (w > 0) andalso (hh > 0), sD )
 
@@ -1458,15 +1458,15 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
 
     ' ---- 3. THE GAP IS SPENT ONLY WHEN THERE IS A CAPTION -------------------------------
     ' Direction 1: drop the caption and the gap must go with it, not just the text width.
-    CCheckBox_SetText( h, "" )
-    CCheckBox_GetIdealSize( h, w, hh )
+    PsCheckBox_SetText( h, "" )
+    PsCheckBox_GetIdealSize( h, w, hh )
     dim as long expectBoxOnly = (2 * ringPad) + 10 + 16 + 10
     sD = "ideal=" & str(w) & " expect=" & str(expectBoxOnly) & " (no gap charged)"
     CHKTest_Check( "no caption = no gap charged", (w = expectBoxOnly), sD )
 
     ' Direction 2: put it back and the gap returns with it.
-    CCheckBox_SetText( h, CAPTION )
-    CCheckBox_GetIdealSize( h, w, hh )
+    PsCheckBox_SetText( h, CAPTION )
+    PsCheckBox_GetIdealSize( h, w, hh )
     sD = "restored=" & str(w) & " expect=" & str(bothW)
     CHKTest_Check( "caption restored = gap restored", (w = bothW), sD )
 
@@ -1475,38 +1475,38 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
     ' only ever proves one branch. Shrink the box below the font and the other branch has to
     ' carry the height -- otherwise "height comes from the box" would be indistinguishable from
     ' "height is always the box".
-    CCheckBox_SetBoxSize( h, 8, 8 )
-    CCheckBox_GetIdealSize( h, w, hh )
+    PsCheckBox_SetBoxSize( h, 8, 8 )
+    PsCheckBox_GetIdealSize( h, w, hh )
     dim as long expectTallText = (2 * ringPad) + 5 + pC->nTextHeight + 5
     sD = "ideal=" & str(hh) & " expect=" & str(expectTallText) & " textH=" & str(pC->nTextHeight) & " boxH=8"
     CHKTest_Check( "small box + caption: height comes from the TEXT", _
                    (pC->nTextHeight > 8) andalso (hh = expectTallText), sD )
 
-    CCheckBox_SetText( h, "" )
-    CCheckBox_GetIdealSize( h, w, hh )
+    PsCheckBox_SetText( h, "" )
+    PsCheckBox_GetIdealSize( h, w, hh )
     dim as long expectShortBox = (2 * ringPad) + 5 + 8 + 5
     sD = "ideal=" & str(hh) & " expect=" & str(expectShortBox) & " (no caption, boxH=8)"
     CHKTest_Check( "small box, no caption: height comes from the BOX", (hh = expectShortBox), sD )
-    CCheckBox_SetText( h, CAPTION )
-    CCheckBox_SetBoxSize( h, 16, 16 )
+    PsCheckBox_SetText( h, CAPTION )
+    PsCheckBox_SetBoxSize( h, 16, 16 )
 
     ' ---- 5. FLIPPING THE BOX SIDE DOES NOT CHANGE THE IDEAL SIZE ------------------------
     ' The mirror is exact: the cell, the gap and both paddings are all still charged, they have
     ' only swapped ends. This is what lets a host flip alignment on a laid-out form.
-    CCheckBox_SetBoxAlign( h, CHK_BOXALIGN_RIGHT )
+    PsCheckBox_SetBoxAlign( h, CHK_BOXALIGN_RIGHT )
     dim as long w2, h2
-    CCheckBox_GetIdealSize( h, w2, h2 )
+    PsCheckBox_GetIdealSize( h, w2, h2 )
     sD = "left=" & str(bothW) & "x" & str(bothH) & " right=" & str(w2) & "x" & str(h2)
     CHKTest_Check( "box side does not change the ideal size", _
                    (w2 = bothW) andalso (h2 = bothH), sD )
-    CCheckBox_SetBoxAlign( h, CHK_BOXALIGN_LEFT )
+    PsCheckBox_SetBoxAlign( h, CHK_BOXALIGN_LEFT )
 
     ' ---- 6. BOXALIGN_LEFT placement ----------------------------------------------------
     ' Size the control to ideal first; every rect query below needs a client area.
     SetWindowPos( h, 0, 0, 0, bothW, bothH, SWP_NOZORDER or SWP_NOMOVE or SWP_NOACTIVATE )
-    CCheckBox_GetContentRect( h, rcCon )
-    CCheckBox_GetBoxRect( h, rcBox )
-    CCheckBox_GetTextRect( h, rcTxt )
+    PsCheckBox_GetContentRect( h, rcCon )
+    PsCheckBox_GetBoxRect( h, rcBox )
+    PsCheckBox_GetTextRect( h, rcTxt )
     sD = "content=" & CHKTest_RectStr( rcCon ) & " box=" & CHKTest_RectStr( rcBox )
     CHKTest_Check( "LEFT: box pinned at padLeft", (rcBox.left - rcCon.left) = 10, sD )
     sD = "box=" & CHKTest_RectStr( rcBox ) & " text=" & CHKTest_RectStr( rcTxt )
@@ -1518,10 +1518,10 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
                    ((rcBox.right - rcBox.left) = 16) andalso ((rcBox.bottom - rcBox.top) = 16), sD )
 
     ' ---- 7. BOXALIGN_RIGHT is the exact mirror ------------------------------------------
-    CCheckBox_SetBoxAlign( h, CHK_BOXALIGN_RIGHT )
-    CCheckBox_GetContentRect( h, rcCon )
-    CCheckBox_GetBoxRect( h, rcBox )
-    CCheckBox_GetTextRect( h, rcTxt )
+    PsCheckBox_SetBoxAlign( h, CHK_BOXALIGN_RIGHT )
+    PsCheckBox_GetContentRect( h, rcCon )
+    PsCheckBox_GetBoxRect( h, rcBox )
+    PsCheckBox_GetTextRect( h, rcTxt )
     sD = "content=" & CHKTest_RectStr( rcCon ) & " box=" & CHKTest_RectStr( rcBox )
     CHKTest_Check( "RIGHT: box pinned at padRight", (rcCon.right - rcBox.right) = 10, sD )
     sD = "box=" & CHKTest_RectStr( rcBox ) & " text=" & CHKTest_RectStr( rcTxt )
@@ -1534,28 +1534,28 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
 
     ' ---- 8. a much longer caption never moves the box, in EITHER alignment ---------------
     ' The control is re-sized to the new ideal each time, which is what a host would do.
-    CCheckBox_SetText( h, "A Very Much Longer Caption Indeed" )
-    CCheckBox_GetIdealSize( h, w, hh )
+    PsCheckBox_SetText( h, "A Very Much Longer Caption Indeed" )
+    PsCheckBox_GetIdealSize( h, w, hh )
     SetWindowPos( h, 0, 0, 0, w, hh, SWP_NOZORDER or SWP_NOMOVE or SWP_NOACTIVATE )
-    CCheckBox_GetContentRect( h, rcCon )
-    CCheckBox_GetBoxRect( h, rcBox )
+    PsCheckBox_GetContentRect( h, rcCon )
+    PsCheckBox_GetBoxRect( h, rcBox )
     sD = "padR=" & str(rcCon.right - rcBox.right)
     CHKTest_Check( "RIGHT: caption length never moves the box", (rcCon.right - rcBox.right) = 10, sD )
 
-    CCheckBox_SetBoxAlign( h, CHK_BOXALIGN_LEFT )
-    CCheckBox_GetContentRect( h, rcCon )
-    CCheckBox_GetBoxRect( h, rcBox )
+    PsCheckBox_SetBoxAlign( h, CHK_BOXALIGN_LEFT )
+    PsCheckBox_GetContentRect( h, rcCon )
+    PsCheckBox_GetBoxRect( h, rcBox )
     sD = "padL=" & str(rcBox.left - rcCon.left)
     CHKTest_Check( "LEFT: caption length never moves the box", (rcBox.left - rcCon.left) = 10, sD )
 
-    CCheckBox_SetText( h, CAPTION )
-    CCheckBox_GetIdealSize( h, w, hh )
+    PsCheckBox_SetText( h, CAPTION )
+    PsCheckBox_GetIdealSize( h, w, hh )
     SetWindowPos( h, 0, 0, 0, w, hh, SWP_NOZORDER or SWP_NOMOVE or SWP_NOACTIVATE )
 
     ' ---- 9. everything is vertically centred in the content -----------------------------
-    CCheckBox_GetContentRect( h, rcCon )
-    CCheckBox_GetBoxRect( h, rcBox )
-    CCheckBox_GetTextRect( h, rcTxt )
+    PsCheckBox_GetContentRect( h, rcCon )
+    PsCheckBox_GetBoxRect( h, rcBox )
+    PsCheckBox_GetTextRect( h, rcTxt )
     dim as long conH = rcCon.bottom - rcCon.top
     sD = "boxTop=" & str(rcBox.top - rcCon.top) & " expect=" & str((conH - 16) \ 2)
     CHKTest_Check( "box v-centred in the content", (rcBox.top - rcCon.top) = ((conH - 16) \ 2), sD )
@@ -1564,19 +1564,19 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
                    (rcTxt.top - rcCon.top) = ((conH - pC->nTextHeight) \ 2), sD )
 
     ' ---- 10. an absent caption gives an EMPTY rect; the box never does -------------------
-    CCheckBox_SetText( h, "" )
-    CCheckBox_GetTextRect( h, rcTxt )
-    CCheckBox_GetBoxRect( h, rcBox )
+    PsCheckBox_SetText( h, "" )
+    PsCheckBox_GetTextRect( h, rcTxt )
+    PsCheckBox_GetBoxRect( h, rcBox )
     sD = "text=" & CHKTest_RectStr( rcTxt )
     CHKTest_Check( "no caption = empty text rect", IsRectEmpty( @rcTxt ) <> 0, sD )
     sD = "box=" & CHKTest_RectStr( rcBox )
     CHKTest_Check( "the box rect is never empty", IsRectEmpty( @rcBox ) = 0, sD )
-    CCheckBox_SetText( h, CAPTION )
+    PsCheckBox_SetText( h, CAPTION )
     SetWindowPos( h, 0, 0, 0, bothW, bothH, SWP_NOZORDER or SWP_NOMOVE or SWP_NOACTIVATE )
 
     ' ---- 11. the focus-ring band is reserved, and is the whole difference ----------------
-    CCheckBox_GetContentRect( h, rcCon )
-    CCheckBox_GetVisualRect( h, rcVis )
+    PsCheckBox_GetContentRect( h, rcCon )
+    PsCheckBox_GetVisualRect( h, rcVis )
     sD = "visual=" & CHKTest_RectStr( rcVis ) & " content=" & CHKTest_RectStr( rcCon ) & _
          " ringPad=" & str(ringPad)
     CHKTest_Check( "visual = content inflated by ringPad", _
@@ -1588,15 +1588,15 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
     ' THE NO-JUMP GUARANTEE: geometry with focus must be byte-identical to geometry without it.
     ' Asserted rather than assumed, because "the band is reserved unconditionally" is exactly the
     ' kind of claim an optimisation would quietly break.
-    CCheckBox_GetBoxRect( h, rcBox )
-    CCheckBox_GetTextRect( h, rcTxt )
+    PsCheckBox_GetBoxRect( h, rcBox )
+    PsCheckBox_GetTextRect( h, rcTxt )
     dim as RECT rcBoxUnfocused = rcBox
     dim as RECT rcTxtUnfocused = rcTxt
     dim as boolean bSavedFocus = pC->isFocused
     pC->isFocused = true
     pC->bLayoutDirty = true
-    CCheckBox_GetBoxRect( h, rcBox )
-    CCheckBox_GetTextRect( h, rcTxt )
+    PsCheckBox_GetBoxRect( h, rcBox )
+    PsCheckBox_GetTextRect( h, rcTxt )
     pC->isFocused = bSavedFocus
     sD = "unfocused=" & CHKTest_RectStr( rcBoxUnfocused ) & " focused=" & CHKTest_RectStr( rcBox )
     CHKTest_Check( "focus does not move anything", _
@@ -1606,8 +1606,8 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
     ' ---- 12. overflow is honest: the span collapses, the box does not --------------------
     dim as long narrow = (2 * ringPad) + 10 + 16 + 8 + 10        ' exactly no room for a caption
     SetWindowPos( h, 0, 0, 0, narrow, bothH, SWP_NOZORDER or SWP_NOMOVE or SWP_NOACTIVATE )
-    CCheckBox_GetBoxRect( h, rcBox )
-    CCheckBox_GetTextRect( h, rcTxt )
+    PsCheckBox_GetBoxRect( h, rcBox )
+    PsCheckBox_GetTextRect( h, rcTxt )
     sD = "text=" & CHKTest_RectStr( rcTxt ) & " width=" & str(rcTxt.right - rcTxt.left)
     CHKTest_Check( "too narrow: span degenerates, never goes negative", _
                    (rcTxt.right >= rcTxt.left) andalso ((rcTxt.right - rcTxt.left) = 0), sD )
@@ -1618,7 +1618,7 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
     ' ---- 13. the ideal size does NOT follow the client ------------------------------------
     ' The ellipsis is a paint-time concern only, so a host that sizes with GetIdealSize can never
     ' see one -- and that is only true if starving the control leaves the measurement alone.
-    CCheckBox_GetIdealSize( h, w2, h2 )
+    PsCheckBox_GetIdealSize( h, w2, h2 )
     sD = "ideal now=" & str(w2) & "x" & str(h2) & " expect=" & str(bothW) & "x" & str(bothH)
     CHKTest_Check( "ideal size unaffected by a starved client", _
                    (w2 = bothW) andalso (h2 = bothH), sD )
@@ -1628,25 +1628,25 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
     ' disabled > pressed > hot > idle. All eight combinations, because the interesting ones are
     ' the contradictory states (disabled AND pressed) that only a race can produce.
     CHKTest_Check( "mood: enabled,idle", _
-                   CCheckBox_ResolveMood( true, false, false ) = CHK_MOOD_IDLE, "" )
+                   PsCheckBox_ResolveMood( true, false, false ) = CHK_MOOD_IDLE, "" )
     CHKTest_Check( "mood: enabled,hot", _
-                   CCheckBox_ResolveMood( true, false, true ) = CHK_MOOD_HOT, "" )
+                   PsCheckBox_ResolveMood( true, false, true ) = CHK_MOOD_HOT, "" )
     CHKTest_Check( "mood: enabled,pressed", _
-                   CCheckBox_ResolveMood( true, true, false ) = CHK_MOOD_PRESSED, "" )
+                   PsCheckBox_ResolveMood( true, true, false ) = CHK_MOOD_PRESSED, "" )
     CHKTest_Check( "mood: pressed beats hot", _
-                   CCheckBox_ResolveMood( true, true, true ) = CHK_MOOD_PRESSED, "" )
+                   PsCheckBox_ResolveMood( true, true, true ) = CHK_MOOD_PRESSED, "" )
     CHKTest_Check( "mood: disabled,idle", _
-                   CCheckBox_ResolveMood( false, false, false ) = CHK_MOOD_DISABLED, "" )
+                   PsCheckBox_ResolveMood( false, false, false ) = CHK_MOOD_DISABLED, "" )
     CHKTest_Check( "mood: disabled beats hot", _
-                   CCheckBox_ResolveMood( false, false, true ) = CHK_MOOD_DISABLED, "" )
+                   PsCheckBox_ResolveMood( false, false, true ) = CHK_MOOD_DISABLED, "" )
     CHKTest_Check( "mood: disabled beats pressed", _
-                   CCheckBox_ResolveMood( false, true, false ) = CHK_MOOD_DISABLED, "" )
+                   PsCheckBox_ResolveMood( false, true, false ) = CHK_MOOD_DISABLED, "" )
     CHKTest_Check( "mood: disabled beats both", _
-                   CCheckBox_ResolveMood( false, true, true ) = CHK_MOOD_DISABLED, "" )
+                   PsCheckBox_ResolveMood( false, true, true ) = CHK_MOOD_DISABLED, "" )
 
     ' ---- 15. isChecked selects the box colour, and touches NOTHING else ------------------
-    dim as CCHECKBOX_COLORS c
-    CCheckBox_GetColors( h, @c )
+    dim as PSCHECKBOX_COLORS c
+    PsCheckBox_GetColors( h, @c )
     ' Make every field distinguishable, so an assertion cannot pass by two colours happening to
     ' be equal (which the four BackColors ARE by default -- the flat look).
     c.BackColor               = BGR(1,0,0)
@@ -1672,12 +1672,12 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
 
     for i as long = 0 to 3
         dim as COLORREF uBack, uFore, uBox
-        CCheckBox_ResolveColors( @c, nMoods(i), false, uBack, uFore, uBox )
+        PsCheckBox_ResolveColors( @c, nMoods(i), false, uBack, uFore, uBox )
         sD = "mood=" & str(nMoods(i)) & " box=" & hex(uBox) & " expect=" & hex(cBoxOff(i))
         CHKTest_Check( "unchecked box colour follows the mood", (uBox = cBoxOff(i)), sD )
 
         dim as COLORREF kBack, kFore, kBox
-        CCheckBox_ResolveColors( @c, nMoods(i), true, kBack, kFore, kBox )
+        PsCheckBox_ResolveColors( @c, nMoods(i), true, kBack, kFore, kBox )
         sD = "mood=" & str(nMoods(i)) & " box=" & hex(kBox) & " expect=" & hex(cBoxOn(i))
         CHKTest_Check( "checked box colour follows the mood", (kBox = cBoxOn(i)), sD )
 
@@ -1688,46 +1688,46 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
     next
 
     ' Put the defaults back before the render probes, so they measure the shipping look.
-    dim as CCHECKBOX_COLORS cFresh
-    CCheckBox_SetColors( h, @cFresh )
+    dim as PSCHECKBOX_COLORS cFresh
+    PsCheckBox_SetColors( h, @cFresh )
 
     ' ---- 16. THE NOTIFY CONTRACT, MEASURED -----------------------------------------------
     ' "Setters are silent, actions notify" is the family's most-repeated rule and the easiest to
     ' break by accident, so it is counted rather than reasoned about.
-    CCheckBox_SetCheckChangedCallback( h, @CHKTest_OnCheckChanged )
-    CCheckBox_SetChecked( h, false )
+    PsCheckBox_SetCheckChangedCallback( h, @CHKTest_OnCheckChanged )
+    PsCheckBox_SetChecked( h, false )
     gCHK_NotifyCount = 0
     gCHK_NotifyLast  = false
 
-    CCheckBox_SetChecked( h, true )
-    sD = "notifications=" & str(gCHK_NotifyCount) & " checked=" & str(CCheckBox_GetChecked(h))
+    PsCheckBox_SetChecked( h, true )
+    sD = "notifications=" & str(gCHK_NotifyCount) & " checked=" & str(PsCheckBox_GetChecked(h))
     CHKTest_Check( "SetChecked is SILENT", _
-                   (gCHK_NotifyCount = 0) andalso (CCheckBox_GetChecked(h) = true), sD )
+                   (gCHK_NotifyCount = 0) andalso (PsCheckBox_GetChecked(h) = true), sD )
 
-    CCheckBox_Toggle( h )
+    PsCheckBox_Toggle( h )
     sD = "notifications=" & str(gCHK_NotifyCount) & " callback saw=" & str(gCHK_NotifyLast) & _
-         " getter says=" & str(CCheckBox_GetChecked(h))
+         " getter says=" & str(PsCheckBox_GetChecked(h))
     CHKTest_Check( "Toggle FIRES exactly once", (gCHK_NotifyCount = 1), sD )
-    CHKTest_Check( "Toggle flipped the state", (CCheckBox_GetChecked(h) = false), sD )
+    CHKTest_Check( "Toggle flipped the state", (PsCheckBox_GetChecked(h) = false), sD )
     CHKTest_Check( "the callback was handed the NEW state", _
-                   (gCHK_NotifyLast = CCheckBox_GetChecked(h)), sD )
+                   (gCHK_NotifyLast = PsCheckBox_GetChecked(h)), sD )
 
     ' A disabled control refuses the action, exactly as a real click would be refused.
-    CCheckBox_SetEnabled( h, false )
-    CCheckBox_Toggle( h )
-    sD = "notifications=" & str(gCHK_NotifyCount) & " checked=" & str(CCheckBox_GetChecked(h))
+    PsCheckBox_SetEnabled( h, false )
+    PsCheckBox_Toggle( h )
+    sD = "notifications=" & str(gCHK_NotifyCount) & " checked=" & str(PsCheckBox_GetChecked(h))
     CHKTest_Check( "Toggle is refused on a disabled control", _
-                   (gCHK_NotifyCount = 1) andalso (CCheckBox_GetChecked(h) = false), sD )
-    CCheckBox_SetEnabled( h, true )
-    sD = "enabled=" & str(CCheckBox_GetEnabled(h))
+                   (gCHK_NotifyCount = 1) andalso (PsCheckBox_GetChecked(h) = false), sD )
+    PsCheckBox_SetEnabled( h, true )
+    sD = "enabled=" & str(PsCheckBox_GetEnabled(h))
     CHKTest_Check( "SetEnabled round-trips through EnableWindow", _
-                   (CCheckBox_GetEnabled(h) = true) andalso (IsWindowEnabled(h) <> 0), sD )
-    CCheckBox_SetCheckChangedCallback( h, 0 )
+                   (PsCheckBox_GetEnabled(h) = true) andalso (IsWindowEnabled(h) <> 0), sD )
+    PsCheckBox_SetCheckChangedCallback( h, 0 )
 
     ' ---- 17. the window text really is the caption ---------------------------------------
     ' ASK THE CONTROL. Reading the field back would assert nothing about the message handlers,
     ' which are the whole point of this section -- a SendMessage whose return value is discarded
-    ' is an assumption, not an implementation (the CNumericUpDown lesson).
+    ' is an assumption, not an implementation (the PsNumericUpDown lesson).
     dim as wstring * 64 wszSet = "Window Text Test"
     SendMessageW( h, WM_SETTEXT, 0, cast( LPARAM, @wszSet ) )
 
@@ -1753,24 +1753,24 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
     dim as wstring * 64 wszWin
     GetWindowTextW( h, @wszWin, 64 )
     dim as wstring * 64 wszApi
-    wszApi = CCheckBox_GetText( h )
-    sD = "GetWindowText=[" & str(wszWin) & "] CCheckBox_GetText=[" & str(wszApi) & "]"
-    CHKTest_Check( "GetWindowText agrees with CCheckBox_GetText", (wszWin = wszApi), sD )
+    wszApi = PsCheckBox_GetText( h )
+    sD = "GetWindowText=[" & str(wszWin) & "] PsCheckBox_GetText=[" & str(wszApi) & "]"
+    CHKTest_Check( "GetWindowText agrees with PsCheckBox_GetText", (wszWin = wszApi), sD )
 
     ' SetWindowText must go the other way and re-measure.
     dim as long wBefore = 0, hBefore = 0
-    CCheckBox_GetIdealSize( h, wBefore, hBefore )
+    PsCheckBox_GetIdealSize( h, wBefore, hBefore )
     SetWindowTextW( h, "Substantially Longer Window Text" )
-    CCheckBox_GetIdealSize( h, w2, h2 )
+    PsCheckBox_GetIdealSize( h, w2, h2 )
     sD = "before=" & str(wBefore) & " after=" & str(w2)
     CHKTest_Check( "SetWindowText re-measures the control", (w2 > wBefore), sD )
-    CCheckBox_SetText( h, CAPTION )
+    PsCheckBox_SetText( h, CAPTION )
 
     ' ---- 18. the control is a tab ITEM, not a tab CONTAINER ------------------------------
     ' CWindow.Create defaults dwExStyle to WS_EX_CONTROLPARENT OR WS_EX_WINDOWEDGE, so a control
     ' that passes only dwStyle gets the container flag by accident -- and the dialog manager then
     ' descends into it, finds no children, and abandons the Tab walk for the WHOLE FORM. That
-    ' shipped in CButton, CToggle and CComboBox; it is asserted here rather than remembered.
+    ' shipped in PsButton, PsToggle and PsComboBox; it is asserted here rather than remembered.
     dim as ulong exStyle = cast( ulong, GetWindowLongPtr( h, GWL_EXSTYLE ) )
     sD = "exstyle=&h" & hex(exStyle)
     CHKTest_Check( "NOT a control parent (or Tab dies form-wide)", _
@@ -1807,53 +1807,53 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
     ' ---- 19. the render probes ------------------------------------------------------------
     ' (a) The control is not a solid block. A part wiped by a PaintBorderRect fill is literally
     '     ONE tone, so the useful signal is the count LEAVING 1 -- not the count being large.
-    CCheckBox_GetIdealSize( h, w, hh )
+    PsCheckBox_GetIdealSize( h, w, hh )
     SetWindowPos( h, 0, 0, 0, w, hh, SWP_NOZORDER or SWP_NOMOVE or SWP_NOACTIVATE )
 
-    dim as long tContent = CCheckBox_CountRenderedTones( h, CHK_PART_CONTROL )
+    dim as long tContent = PsCheckBox_CountRenderedTones( h, CHK_PART_CONTROL )
     sD = "distinct tones in the content=" & str(tContent)
     CHKTest_Check( "built-in painter does not flood the control", (tContent > 1), sD )
 
-    dim as long tBox = CCheckBox_CountRenderedTones( h, CHK_PART_BOX )
+    dim as long tBox = PsCheckBox_CountRenderedTones( h, CHK_PART_BOX )
     sD = "distinct tones in the box cell=" & str(tBox)
     CHKTest_Check( "the box glyph actually reached the surface", (tBox > 1), sD )
 
-    dim as long tText = CCheckBox_CountRenderedTones( h, CHK_PART_TEXT )
+    dim as long tText = PsCheckBox_CountRenderedTones( h, CHK_PART_TEXT )
     sD = "distinct tones in the caption span=" & str(tText)
     CHKTest_Check( "the caption actually reached the surface", (tText > 1), sD )
 
     ' (b) CHECKING THE BOX CHANGES WHAT IS DRAWN. Every other assertion in this file can pass
     '     while both states render the identical glyph: the flag flips, the layout is right, the
     '     colours resolve correctly, and the pixels never move. This one asks the pixels.
-    CCheckBox_SetChecked( h, false )
-    dim as ulong hashOff = CCheckBox_HashRenderedPart( h, CHK_PART_BOX )
-    CCheckBox_SetChecked( h, true )
-    dim as ulong hashOn  = CCheckBox_HashRenderedPart( h, CHK_PART_BOX )
+    PsCheckBox_SetChecked( h, false )
+    dim as ulong hashOff = PsCheckBox_HashRenderedPart( h, CHK_PART_BOX )
+    PsCheckBox_SetChecked( h, true )
+    dim as ulong hashOn  = PsCheckBox_HashRenderedPart( h, CHK_PART_BOX )
     sD = "unchecked=&h" & hex(hashOff) & " checked=&h" & hex(hashOn)
     CHKTest_Check( "the checked state reaches the pixels", _
                    (hashOff <> hashOn) andalso (hashOff <> 0) andalso (hashOn <> 0), sD )
 
     ' ...and it must be the STATE doing it, not the probe being noisy: the same state twice must
     ' hash identically, or the assertion above proves nothing.
-    dim as ulong hashOn2 = CCheckBox_HashRenderedPart( h, CHK_PART_BOX )
+    dim as ulong hashOn2 = PsCheckBox_HashRenderedPart( h, CHK_PART_BOX )
     sD = "first=&h" & hex(hashOn) & " second=&h" & hex(hashOn2)
     CHKTest_Check( "the probe is deterministic for one state", (hashOn = hashOn2), sD )
-    CCheckBox_SetChecked( h, false )
+    PsCheckBox_SetChecked( h, false )
 
     ' (c) AND IT MUST BE THE GLYPH DOING IT, NOT MERELY THE COLOUR.
     '
-    ' The assertion above was A/B'd by freezing CCHECKBOX.ResolveGlyph to always return the
+    ' The assertion above was A/B'd by freezing PSCHECKBOX.ResolveGlyph to always return the
     ' unchecked glyph -- and IT STILL PASSED, because isChecked also switches the box COLOUR, and
     ' that alone moves the pixels. So it proves "the state reaches the surface", which is true and
     ' worth having, but NOT the narrower claim its name suggests.
     '
     ' Isolating it costs four lines: flatten all eight box colours to one value, so the colour
     ' can no longer account for any difference, and the ONLY thing left that can move a pixel is
-    ' the glyph swap. (This is CMessageBox's lesson -- an assertion that is not isolated measures
+    ' the glyph swap. (This is PsMessageBox's lesson -- an assertion that is not isolated measures
     ' the wrong quantity while looking entirely reasonable.)
     scope
-        dim as CCHECKBOX_COLORS cIso
-        CCheckBox_GetColors( h, @cIso )
+        dim as PSCHECKBOX_COLORS cIso
+        PsCheckBox_GetColors( h, @cIso )
         dim as COLORREF flat = BGR(210,210,210)
         cIso.BoxColor                = flat
         cIso.BoxColorHot             = flat
@@ -1863,25 +1863,25 @@ sub CCheckBox_RunSelfTest( byval hWndParent as HWND )
         cIso.BoxColorCheckedHot      = flat
         cIso.BoxColorCheckedPressed  = flat
         cIso.BoxColorCheckedDisabled = flat
-        CCheckBox_SetColors( h, @cIso )
+        PsCheckBox_SetColors( h, @cIso )
 
-        CCheckBox_SetChecked( h, false )
-        dim as ulong glyphOff = CCheckBox_HashRenderedPart( h, CHK_PART_BOX )
-        CCheckBox_SetChecked( h, true )
-        dim as ulong glyphOn  = CCheckBox_HashRenderedPart( h, CHK_PART_BOX )
-        CCheckBox_SetChecked( h, false )
+        PsCheckBox_SetChecked( h, false )
+        dim as ulong glyphOff = PsCheckBox_HashRenderedPart( h, CHK_PART_BOX )
+        PsCheckBox_SetChecked( h, true )
+        dim as ulong glyphOn  = PsCheckBox_HashRenderedPart( h, CHK_PART_BOX )
+        PsCheckBox_SetChecked( h, false )
 
         sD = "one box colour for both states: unchecked=&h" & hex(glyphOff) & _
              " checked=&h" & hex(glyphOn)
         CHKTest_Check( "the GLYPH swap alone reaches the pixels", _
                        (glyphOff <> glyphOn) andalso (glyphOff <> 0) andalso (glyphOn <> 0), sD )
 
-        CCheckBox_SetColors( h, @cFresh )
+        PsCheckBox_SetColors( h, @cFresh )
     end scope
 
     DestroyWindow(h)
 
-    dim as string sSummary = "=== CCheckBox: " & str(gCHK_TestCount - gCHK_FailCount) & _
+    dim as string sSummary = "=== PsCheckBox: " & str(gCHK_TestCount - gCHK_FailCount) & _
                              "/" & str(gCHK_TestCount) & " assertions passed"
     if gCHK_FailCount > 0 then sSummary &= "  (" & str(gCHK_FailCount) & " FAILED)"
     print sSummary

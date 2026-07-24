@@ -1,4 +1,4 @@
-'    CCheckBox - reusable owner-drawn checkbox control
+'    PsCheckBox - reusable owner-drawn checkbox control
 '    Copyright (C) 2016-2026 Paul Squires, PlanetSquires Software
 '
 '    This program is free software: you can redistribute it and/or modify
@@ -14,8 +14,8 @@
 #pragma once
 
 ' The demo lays the checkboxes out as a settings pane: one per row, an explanatory label on the
-' left drawn by the form, and the control itself on the right -- the same arrangement CButton's
-' and CComboBox's demos use, so the three can be compared directly.
+' left drawn by the form, and the control itself on the right -- the same arrangement PsButton's
+' and PsComboBox's demos use, so the three can be compared directly.
 '
 '    0  box LEFT of the caption -- the default look
 '    1  box RIGHT, sized to its IDEAL width      -> packed against the caption
