@@ -275,6 +275,10 @@ type PSCHECKBOX
     isEnabled         as boolean = true
     isHot             as boolean = false  ' the mouse is over the client
     isFocused         as boolean = false
+    ' Set when a WM_KEYDOWN we consume will be followed by a WM_CHAR, so that character can be
+    ' swallowed too. Without it the character reaches DefWindowProc and the system BEEPS on
+    ' every Enter/Space -- the keystroke still works, so the beep is the only symptom.
+    bAteKeyDown   as boolean = false
     isPressed         as boolean = false  ' a live left press (see the capture note below)
     hotTimerOn        as boolean = false  ' is the hot-tracking safety-net timer running?
     ' --- Press state (mouse capture). The control TAKES capture on a press: the press/cancel
