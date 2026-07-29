@@ -1132,14 +1132,17 @@ sub PsCheckBox_SetTooltipText( byval hCheckBox as HWND, byval Text as DWSTRING )
     pChk->wszTooltip = Text
 end sub
 
+' The comctl32 handle, and 0 while on PsTooltip -- the honest answer, since a TTM_* sent
+' to a PsTooltip window is silently ignored.
 function PsCheckBox_GetTooltipHandle( byval hCheckBox as HWND ) as HWND
     dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return 0
     return PsTipHost_SysHandle( @pChk->tip )
 end function
 
-' The comctl32 handle, and 0 while on PsTooltip -- the honest answer, since a TTM_* sent
-' to a PsTooltip window is silently ignored.
+' The PsTooltip window, and 0 while on the system backend. This is the door to PsTooltip's
+' own SetColors/SetFonts/SetStyle/SetMaxWidth/SetTitle/SetGlyph, none of which is mirrored
+' on this control.
 function PsCheckBox_GetPsTooltipHandle( byval hCheckBox as HWND ) as HWND
     dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return 0
