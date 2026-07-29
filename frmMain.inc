@@ -490,6 +490,14 @@ function frmMain_Show( byval hWndParent as HWND ) as LRESULT
         print sHash
     end if
 
+    ' A self-test run closes the window so the process exits and the suite can run
+    ' unattended. Without this the demo sits in its pump and the console output stays
+    ' BUFFERED -- killing the run then loses every line, the summary included.
+    if environ("PSCHECKBOX_SELFTEST") = "1" then
+        DestroyWindow( pWindow->hWindow )
+        return 0
+    end if
+
     UpdateWindow( pWindow->hWindow )
     ShowWindow( pWindow->hWindow, SW_SHOW )
 

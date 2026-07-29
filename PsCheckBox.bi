@@ -8,6 +8,9 @@
 ' AfxNova, and every host in this family says "using AfxNova" -- so ANY identifier named "ok"
 ' becomes a duplicate definition. The family convention is bOK.
 #include once "PsBufferPaint.bi"
+' The tooltip backend switch. The control ships on the SYSTEM (comctl32) backend exactly
+' as it always has; a host opts an instance into PsTooltip with PsCheckBox_SetTooltipMode.
+#include once "PsTipHost.bi"
 
 ' Polling timer that guarantees hot-tracking is cleared when the mouse leaves the control.
 ' WM_MOUSELEAVE (TME_LEAVE) is not reliably delivered on fast exits, so a periodic cursor
@@ -251,7 +254,10 @@ type CHK_CheckChangedCallbackSub as sub( byval hCheckBox as HWND, byval isChecke
 
 type PSCHECKBOX
     hWin              as HWND
-    hToolTip          as HWND
+    ' The tooltip, whichever backend it is on. Replaces the old hToolTip + HoverTime
+    ' pair; PsCheckBox_GetTooltipHandle still answers the comctl32 handle, and 0 while
+    ' this instance is on PsTooltip.
+    tip         as PSTIPHOST
     ' Instance-lifetime buffer that TTN_GETDISPINFOW's lpszText is pointed at. It must NOT be
     ' the same field as wszTooltip below: that one is the host's authored text, and overwriting
     ' it with a callback's answer would silently promote a transient string into stored state.
@@ -259,7 +265,6 @@ type PSCHECKBOX
     idc_CheckBox      as long = 0
     id                as long = 0        ' host command id, reported by CheckChangedCallback
     itemData          as integer = 0     ' free-form host payload
-    HoverTime         as long = 250
     ' --- Content ---
     wszText           as DWSTRING        ' the caption. "" = no caption (and no gap spent)
     ' The two box glyphs. Seeded by PsCheckBox_Create, NOT by a field initializer here: a DWSTRING
@@ -831,6 +836,16 @@ declare function PsCheckBox_GetTooltipText( byval hCheckBox as HWND ) as DWSTRIN
 declare sub      PsCheckBox_SetTooltipText( byval hCheckBox as HWND, byval Text as DWSTRING )
 declare function PsCheckBox_GetTooltipHandle( byval hCheckBox as HWND ) as HWND
 declare sub      PsCheckBox_SetHoverTime( byval hCheckBox as HWND, byval milliseconds as long )
+declare function PsCheckBox_SetTooltipMode( byval hCheckBox as HWND, byval nMode as long ) as boolean
+declare function PsCheckBox_GetTooltipMode( byval hCheckBox as HWND ) as long
+' The PsTooltip window, or 0 on the system backend. The door to PsTooltip's own
+' SetColors/SetFonts/SetStyle/SetMaxWidth/SetTitle/SetGlyph -- deliberately not mirrored
+' here, since thirteen controls x twenty setters is 260 wrappers to keep in step.
+declare function PsCheckBox_GetPsTooltipHandle( byval hCheckBox as HWND ) as HWND
+' Honoured by BOTH backends. A delay never set keeps the backend's own derivation from
+' the system double-click time.
+declare sub      PsCheckBox_SetAutoPopTime( byval hCheckBox as HWND, byval milliseconds as long )
+declare sub      PsCheckBox_SetReshowTime( byval hCheckBox as HWND, byval milliseconds as long )
 
 ' ----------------------------------------------------------------------------------------
 ' Callbacks.  See the type declarations above for each signature and contract.
