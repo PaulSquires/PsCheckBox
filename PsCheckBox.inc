@@ -3,6 +3,8 @@
 ''
 
 #include once "PsCheckBox.bi"
+' The tooltip backend switch, pulled in here so a host needs no extra include line.
+#include once "PsTipHost.inc"
 
 
 ' Forward declaration: the content setters re-apply auto-size, and they are defined well above
@@ -638,7 +640,7 @@ function PsCheckBox_WndProc( _
         ' Delete the stored checkbox data pointer. The two fonts are the host's and are left
         ' alone; the tooltip window is ours and goes with us.
         if pChk then
-            if IsWindow(pChk->hToolTip) then DestroyWindow(pChk->hToolTip)
+            PsTipHost_Destroy( @pChk->tip )
             delete(pChk)
         end if
 
@@ -656,32 +658,17 @@ end function
 
 
 ' ========================================================================================
-' Create a tooltip that pulls its text on demand (LPSTR_TEXTCALLBACK) for the whole control.
-' TTN_GETDISPINFOW therefore goes to TOOLINFO.hwnd, which is the control itself (NOT the parent
-' form), and PsCheckBox_WndProc answers it.
+' Supply the tooltip text to the PsTooltip backend.
+'
+' This thunk is why PsTipHost never learns the text policy: PsCheckBox_ResolveTooltipText
+' stays the ONE place that decides what a tip says, and the system backend reaches the
+' same function by the other road (comctl32 asking through TTN_GETDISPINFOW), which is
+' why that arm stays in the WndProc.
 ' ========================================================================================
-private function PsCheckBox_AddTooltip( byval hCtrl as HWND ) as HWND
-    if IsWindow(hCtrl) = 0 then return 0
-    dim as HWND hTooltip = CreateWindowExW( 0, "tooltips_class32", "", _
-                                            WS_POPUP or TTS_ALWAYSTIP, _
-                                            0, 0, 0, 0, NULL, NULL, NULL, NULL )
-    if hTooltip = 0 then return 0
-    SetWindowPos( hTooltip, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE )
-
-    dim tti as TOOLINFOW
-    ' cbSize must match the running comctl32 version (see AfxNova AfxAddTooltip).
-    #ifdef __FB_64BIT__
-        if AfxComCtlVersion < 600 then tti.cbSize = 64 else tti.cbSize = 72
-    #else
-        if AfxComCtlVersion < 600 then tti.cbSize = 44 else tti.cbSize = 48
-    #endif
-    tti.uFlags   = TTF_IDISHWND or TTF_SUBCLASS
-    tti.hwnd     = hCtrl
-    tti.uId      = cast(UINT_PTR, hCtrl)
-    tti.hinst    = GetModuleHandleW(NULL)
-    tti.lpszText = LPSTR_TEXTCALLBACK
-    SendMessageW( hTooltip, TTM_ADDTOOLW, 0, cast(LPARAM, @tti) )
-    return hTooltip
+private function PsCheckBox_TipTextCallback( byval hTooltip as HWND, byval hAttached as HWND, _
+                                        byval idx as long ) as DWSTRING
+    dim as DWSTRING wszOut = PsCheckBox_ResolveTooltipText( GetCheckBoxPointer(hAttached) )
+    return wszOut
 end function
 
 
@@ -741,12 +728,15 @@ function PsCheckBox_Create( byval hWndParent as HWND, byval CtrlID as long ) as 
     pChk->nFocusGap       = pWindow->ScaleY( PSCHECKBOX_DEFAULT_FOCUSGAP )
     pChk->nFocusCurvature = pWindow->ScaleY( PSCHECKBOX_DEFAULT_FOCUSCURV )
 
-    pChk->hToolTip = PsCheckBox_AddTooltip( hCtrl )
 
     SetWindowLongPtr( hCtrl, GWLP_ID, CtrlID )
 
     ' Store the new pointer into the user data area of the control window
     pWindow->UserData(0) = cast(LONG_PTR, pChk)
+
+    ' AFTER UserData, not before: PsCheckBox_TipTextCallback resolves the control through
+    ' GetCheckBoxPointer(hAttached), which reads exactly that slot.
+    PsTipHost_Ensure( @pChk->tip, hCtrl, @PsCheckBox_TipTextCallback )
 
     function = hCtrl
 
@@ -1142,19 +1132,55 @@ sub PsCheckBox_SetTooltipText( byval hCheckBox as HWND, byval Text as DWSTRING )
     pChk->wszTooltip = Text
 end sub
 
+' The comctl32 handle, and 0 while on PsTooltip -- the honest answer, since a TTM_* sent
+' to a PsTooltip window is silently ignored.
 function PsCheckBox_GetTooltipHandle( byval hCheckBox as HWND ) as HWND
     dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then return 0
-    return pChk->hToolTip
+    return PsTipHost_SysHandle( @pChk->tip )
 end function
 
+' The PsTooltip window, and 0 while on the system backend. This is the door to PsTooltip's
+' own SetColors/SetFonts/SetStyle/SetMaxWidth/SetTitle/SetGlyph, none of which is mirrored
+' on this control.
+function PsCheckBox_GetPsTooltipHandle( byval hCheckBox as HWND ) as HWND
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    if pChk = 0 then return 0
+    return PsTipHost_PsHandle( @pChk->tip )
+end function
+
+function PsCheckBox_SetTooltipMode( byval hCheckBox as HWND, byval nMode as long ) as boolean
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    if pChk = 0 then return false
+    return PsTipHost_SetMode( @pChk->tip, nMode )
+end function
+
+function PsCheckBox_GetTooltipMode( byval hCheckBox as HWND ) as long
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    if pChk = 0 then return PSTIP_MODE_SYSTEM
+    return PsTipHost_GetMode( @pChk->tip )
+end function
+
+' The three delays go through PsTipHost, which STORES them as well as pushing them, so a
+' hover time set before a mode switch is still in force after it. Pushing straight at the
+' live tooltip loses it at the switch -- and the tip still appears, just on a different
+' beat, with nothing reporting the change.
 sub PsCheckBox_SetHoverTime( byval hCheckBox as HWND, byval milliseconds as long )
     dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
     if pChk = 0 then exit sub
-    pChk->HoverTime = milliseconds
-    if IsWindow(pChk->hToolTip) then
-        SendMessageW( pChk->hToolTip, TTM_SETDELAYTIME, TTDT_INITIAL, cast(LPARAM, milliseconds) )
-    end if
+    PsTipHost_SetDelay( @pChk->tip, TTDT_INITIAL, milliseconds )
+end sub
+
+sub PsCheckBox_SetAutoPopTime( byval hCheckBox as HWND, byval milliseconds as long )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    if pChk = 0 then exit sub
+    PsTipHost_SetDelay( @pChk->tip, TTDT_AUTOPOP, milliseconds )
+end sub
+
+sub PsCheckBox_SetReshowTime( byval hCheckBox as HWND, byval milliseconds as long )
+    dim as PSCHECKBOX ptr pChk = GetCheckBoxPointer(hCheckBox)
+    if pChk = 0 then exit sub
+    PsTipHost_SetDelay( @pChk->tip, TTDT_RESHOW, milliseconds )
 end sub
 
 
@@ -1949,6 +1975,75 @@ sub PsCheckBox_RunSelfTest( byval hWndParent as HWND )
             (dc3 and DLGC_WANTALLKEYS) = 0, "dlgcode=&h" & hex(dc3) )
 
         DestroyWindow( hBeep )
+    end scope
+
+
+    ' ====================================================================================
+    ' TOOLTIP BACKEND -- mode, handles, the delays surviving a switch, and the text wiring
+    '
+    ' A real dwell is what would exercise this end to end and no self-test can produce one,
+    ' so what is asserted is the WIRING. The text assertion in particular resolves through
+    ' the callback the tip actually holds rather than by calling our own thunk: on the pilot
+    ' the direct-call version stayed green with the wiring deleted, which would have shipped
+    ' a control that shows no tooltip at all once switched.
+    ' ====================================================================================
+    scope
+        dim as HWND hTipT = PsCheckBox_Create( hWndParent, 9807 )
+        if hTipT = 0 then
+            CHKTest_Check( "tooltip: could not create a test control", false, "Create returned 0" )
+        else
+            CHKTest_Check( "tooltip: still ships on the SYSTEM backend", _
+                (PsCheckBox_GetTooltipMode( hTipT ) = PSTIP_MODE_SYSTEM), _
+                "mode = " & str(PsCheckBox_GetTooltipMode( hTipT )) )
+            CHKTest_Check( "tooltip: a comctl32 window exists, and no PsTooltip does", _
+                (PsCheckBox_GetTooltipHandle( hTipT ) <> 0) andalso _
+                (IsWindow(PsCheckBox_GetTooltipHandle( hTipT )) <> 0) andalso _
+                (PsCheckBox_GetPsTooltipHandle( hTipT ) = 0), _
+                "hSys = " & str(cast(integer, PsCheckBox_GetTooltipHandle( hTipT ))) )
+
+            PsCheckBox_SetHoverTime( hTipT, 777 )
+            CHKTest_Check( "tooltip: SetHoverTime reaches the comctl32 tip", _
+                (SendMessageW( PsCheckBox_GetTooltipHandle( hTipT ), TTM_GETDELAYTIME, TTDT_INITIAL, 0 ) = 777), _
+                "TTM_GETDELAYTIME = " & str(SendMessageW( PsCheckBox_GetTooltipHandle( hTipT ), TTM_GETDELAYTIME, TTDT_INITIAL, 0 )) & " ms" )
+
+            dim as HWND hSysBeforeT = PsCheckBox_GetTooltipHandle( hTipT )
+            ' The switch is made on its own line, NOT inside the assertion call. fbc does not
+            ' evaluate call arguments left to right, so a detail string that reads the mode in
+            ' the same call reports the mode from BEFORE the switch -- a green assertion with a
+            ' trace saying it failed, which is worse than either.
+            dim as boolean bSwitchedT = PsCheckBox_SetTooltipMode( hTipT, PSTIP_MODE_PS )
+            CHKTest_Check( "tooltip: switching to PsTooltip succeeds", bSwitchedT, _
+                "mode = " & str(PsCheckBox_GetTooltipMode( hTipT )) )
+            CHKTest_Check( "tooltip: the outgoing comctl32 window is DESTROYED, not orphaned", _
+                (IsWindow(hSysBeforeT) = 0) andalso (PsCheckBox_GetTooltipHandle( hTipT ) = 0), _
+                "old hSys alive = " & str(IsWindow(hSysBeforeT)) )
+
+            dim as HWND hPsT = PsCheckBox_GetPsTooltipHandle( hTipT )
+            CHKTest_Check( "tooltip: a PsTooltip window exists and is attached to the control", _
+                (hPsT <> 0) andalso (IsWindow(hPsT) <> 0) andalso _
+                (PsTooltip_GetAttached( hPsT ) = hTipT), _
+                "hPs = " & str(cast(integer, hPsT)) )
+
+            dim as PSTOOLTIP ptr pTipT = GetTooltipPointer( hPsT )
+            CHKTest_Check( "tooltip: the hover time set on the OLD backend is honoured by the new one", _
+                (pTipT <> 0) andalso (pTipT->nInitialDelay = 777), _
+                "PsTooltip initial delay = " & str(iif(pTipT, pTipT->nInitialDelay, -1)) & " ms" )
+            CHKTest_Check( "tooltip: the PsTooltip backend is WIRED to the control's text policy", _
+                (pTipT <> 0) andalso (pTipT->TooltipCallback <> 0), _
+                "callback installed = " & str(iif(pTipT andalso pTipT->TooltipCallback, 1, 0)) )
+
+            PsCheckBox_SetTooltipMode( hTipT, PSTIP_MODE_SYSTEM )
+            CHKTest_Check( "tooltip: switching back rebuilds the comctl32 tip, hover time and all", _
+                (PsCheckBox_GetTooltipHandle( hTipT ) <> 0) andalso _
+                (PsCheckBox_GetPsTooltipHandle( hTipT ) = 0) andalso _
+                (SendMessageW( PsCheckBox_GetTooltipHandle( hTipT ), TTM_GETDELAYTIME, TTDT_INITIAL, 0 ) = 777), _
+                "initial = " & str(SendMessageW( PsCheckBox_GetTooltipHandle( hTipT ), TTM_GETDELAYTIME, TTDT_INITIAL, 0 )) & " ms" )
+            CHKTest_Check( "tooltip: an unset delay is left at the backend's own default", _
+                (SendMessageW( PsCheckBox_GetTooltipHandle( hTipT ), TTM_GETDELAYTIME, TTDT_AUTOPOP, 0 ) > 0), _
+                "autopop = " & str(SendMessageW( PsCheckBox_GetTooltipHandle( hTipT ), TTM_GETDELAYTIME, TTDT_AUTOPOP, 0 )) & " ms" )
+
+            DestroyWindow( hTipT )
+        end if
     end scope
 
     dim as string sSummary = "=== PsCheckBox: " & str(gCHK_TestCount - gCHK_FailCount) & _

@@ -31,14 +31,18 @@ Copy these files into your project:
 | `PsCheckBox.inc` | Implementation |
 | `PsBufferPaint.bi` | The double-buffered drawing surface the control paints through |
 | `PsBufferPaint.inc` | |
+| `PsTipHost.bi` / `PsTipHost.inc` | The tooltip backend switch — see *Tooltips: two backends* |
+| `PsTooltip.bi` / `PsTooltip.inc` | The owner-drawn tooltip. Required even if you never switch to it: `PsTipHost.inc` includes it. |
 
 You also need AfxNova on the include path (`-i "C:\dev"` if your tree matches this one), and a
 font supplying the box glyph — `SegoeFluentIcons.ttf` ships with this repo.
 
 ### Include order
 
-`PsCheckBox.inc` includes `PsCheckBox.bi`, which includes `PsBufferPaint.bi`. The **implementation**
-of `PsBufferPaint` is not pulled in for you, so include it yourself, first:
+`PsCheckBox.inc` includes `PsCheckBox.bi`, which includes `PsBufferPaint.bi` and `PsTipHost.bi`;
+`PsCheckBox.inc` also includes `PsTipHost.inc`, which in turn includes `PsTooltip.inc`. So the
+tooltip files need no include line of your own. The **implementation** of `PsBufferPaint` is the
+one thing not pulled in for you, so include it yourself, first:
 
 ```freebasic
 #include once "windows.bi"
@@ -372,12 +376,47 @@ callback to get exactly the colours the built-in painter would have used.
 |---|---|
 | `PsCheckBox_GetTooltipText( hCheckBox ) as DWSTRING` | |
 | `PsCheckBox_SetTooltipText( hCheckBox, Text )` | The control's own tip text. When non-empty it wins over the callback. Stores only — the tip is pulled on demand, so there is nothing to repaint. |
-| `PsCheckBox_GetTooltipHandle( hCheckBox ) as HWND` | The tooltip window, created for you at `Create` and destroyed with the control. |
-| `PsCheckBox_SetHoverTime( hCheckBox, milliseconds )` | Sets `TTDT_INITIAL` on the tooltip. |
+| `PsCheckBox_GetTooltipHandle( hCheckBox ) as HWND` | The **comctl32** tooltip window, for any `TTM_*` message you want to send it yourself. The control owns it and destroys it. Returns **0** while this control is on the PsTooltip backend — the honest answer, since a `TTM_*` sent to a PsTooltip window is silently ignored. |
+| `PsCheckBox_GetPsTooltipHandle( hCheckBox ) as HWND` | The **PsTooltip** window, or 0 while on the system backend. The door to `PsTooltip_SetColors` / `SetFonts` / `SetStyle` / `SetMaxWidth` / `SetTitle` / `SetGlyph` — none of which is mirrored here. |
+| `PsCheckBox_SetTooltipMode( hCheckBox, nMode ) as boolean` | `PSTIP_MODE_SYSTEM` (default) or `PSTIP_MODE_PS`. See below. |
+| `PsCheckBox_GetTooltipMode( hCheckBox ) as long` | Which backend is live. |
+| `PsCheckBox_SetHoverTime( hCheckBox, milliseconds )` | Initial delay (`TTDT_INITIAL`) — how long the cursor must rest. Honoured by **both** backends. |
+| `PsCheckBox_SetAutoPopTime( hCheckBox, milliseconds )` | How long the tip stays up (`TTDT_AUTOPOP`). |
+| `PsCheckBox_SetReshowTime( hCheckBox, milliseconds )` | The shorter delay after a tip was recently dismissed (`TTDT_RESHOW`). |
 
 Resolution order: the control's own text, then `TooltipCallback`, then nothing. **There is no
 caption fallback** — a checkbox whose caption is already on screen would otherwise pop a tip that
 just repeats it.
+
+#### Tooltips: two backends
+
+The control ships on the **system** (comctl32) tooltip it has always used. `PSTIP_MODE_PS`
+switches this instance to **PsTooltip**: owner-drawn, themeable, word-wrapping without a
+hand-sent `TTM_SETMAXTIPWIDTH`, and — the one that matters structurally — **not a subclass of
+the control it serves**, so it still works when the window under the cursor is a descendant
+rather than the control itself. Either way the control adds **no pump obligation**: PsTooltip
+has no `FilterMessage`.
+
+The default is deliberate, not caution. PsTooltip's colour defaults are **dark**, so a control
+that switched itself would put a dark tip on a light form. Theme every tip in the process with
+`PsTooltip_SetDefaultColors` and friends, then opt in per instance.
+
+**The mode changes how a tip is drawn, never what it says.** Both backends resolve text through
+the same rule — this control's own text first, then `TooltipCallback`, then nothing.
+
+A delay you set is **stored as well as pushed**, so it survives a switch in either direction. A
+delay you never set keeps the backend's own derivation from the system double-click time, which
+is what makes a tip appear on the same beat as every other tip on the machine.
+
+```freebasic
+PsTooltip_SetDefaultColors( @myTipColors )     ' once, at startup, for every tip in the process
+PsTooltip_SetDefaultFonts( ghFontUI )
+
+PsCheckBox_SetTooltipMode( hCheck, PSTIP_MODE_PS )
+PsCheckBox_SetHoverTime( hCheck, 400 )
+dim as HWND hTip = PsCheckBox_GetPsTooltipHandle( hCheck )
+if hTip then PsTooltip_SetTitle( hTip, "Dark mode" )   ' not reachable on the system backend
+```
 
 ### Callback registration
 
